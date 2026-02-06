@@ -1,0 +1,31 @@
+web/src/components/NoteCard.tsx
+  d5b49e1d8a7d250e 234,236,238,280,282,284
+web/src/App.tsx
+  d5b49e1d8a7d250e 22,25,31,42,44,50,194,206,229
+docs/plans/2026-02-06-feat-web-ui-hidden-tag-filtering-plan.md
+  d5b49e1d8a7d250e 1-289
+web/src/api.ts
+  d5b49e1d8a7d250e 49,54
+src/routes/notes.rs
+  d5b49e1d8a7d250e 49,124-131,258,272-277,290-295,315-320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "a6fd67bbcd28f87c7100fff0b040dc545750d6ed",
+  "prompts": {
+    "d5b49e1d8a7d250e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d6a0f45-7794-453b-8cca-a480733b95c7",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 340,
+      "total_deletions": 19,
+      "accepted_lines": 334,
+      "overriden_lines": 0
+    }
+  }
+}
