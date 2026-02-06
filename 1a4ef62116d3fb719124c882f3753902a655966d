@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "1a4ef62116d3fb719124c882f3753902a655966d",
+  "prompts": {
+    "d5b49e1d8a7d250e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d6a0f45-7794-453b-8cca-a480733b95c7",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 4,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
