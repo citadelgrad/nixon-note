@@ -1,0 +1,25 @@
+scripts/import-homebrew.sh
+  d5b49e1d8a7d250e 28-30,34-36,38-39,41-42,44-54,64-65,70-77,79,83,98,101-102,108
+README.md
+  d5b49e1d8a7d250e 164-247,262,264-265,267-270,273-274,277-305
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "bd7ca4554af95cfe5729beac3586cde672afb0a2",
+  "prompts": {
+    "d5b49e1d8a7d250e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d6a0f45-7794-453b-8cca-a480733b95c7",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 317,
+      "total_deletions": 198,
+      "accepted_lines": 192,
+      "overriden_lines": 0
+    }
+  }
+}
