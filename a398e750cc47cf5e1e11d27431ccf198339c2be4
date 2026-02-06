@@ -1,0 +1,25 @@
+web/src/App.tsx
+  d5b49e1d8a7d250e 22,135-161
+docs/plans/2026-02-06-feat-web-ui-hidden-tag-filtering-plan.md
+  d5b49e1d8a7d250e 96-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "a398e750cc47cf5e1e11d27431ccf198339c2be4",
+  "prompts": {
+    "d5b49e1d8a7d250e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d6a0f45-7794-453b-8cca-a480733b95c7",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 31,
+      "total_deletions": 4,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    }
+  }
+}
