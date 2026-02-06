@@ -1,0 +1,29 @@
+README.md
+  d5b49e1d8a7d250e 176-178,207-209,252-268,310-311,315-316
+scripts/import-homebrew.sh
+  d5b49e1d8a7d250e 64,72-73
+src/routes/notes.rs
+  d5b49e1d8a7d250e 18-19,98-122,144-148,205-213
+scripts/import-edge-bookmarks.sh
+  d5b49e1d8a7d250e 68,76-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "d65b0aad929d590e7bd27cb335711e71d4c50aad",
+  "prompts": {
+    "d5b49e1d8a7d250e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d6a0f45-7794-453b-8cca-a480733b95c7",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 74,
+      "total_deletions": 9,
+      "accepted_lines": 74,
+      "overriden_lines": 0
+    }
+  }
+}
