@@ -1,0 +1,37 @@
+src/routes/ingest.rs
+  4fab8c7b8386bfcf 278-416
+src/lib.rs
+  4fab8c7b8386bfcf 65
+src/db/queries.rs
+  4fab8c7b8386bfcf 49-56
+web/src/App.tsx
+  4fab8c7b8386bfcf 11,23,58-70,145,241
+web/src/components/CaptureInput.tsx
+  4fab8c7b8386bfcf 3-6,9,11,15,22-24,43,53,64-66,77-103,142,163-165,167,173-174,215,240-244,249-250
+Cargo.toml
+  4fab8c7b8386bfcf 48-51
+web/src/api.ts
+  4fab8c7b8386bfcf 86-99
+src/routes/notes.rs
+  4fab8c7b8386bfcf 99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "4a8a860f2c9298d1a9487e9755cfd3764b7485ad",
+  "prompts": {
+    "4fab8c7b8386bfcf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2758302-af77-4f82-858f-efc4cf62faec",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 306,
+      "total_deletions": 75,
+      "accepted_lines": 249,
+      "overriden_lines": 0
+    }
+  }
+}
