@@ -1,0 +1,55 @@
+Cargo.toml
+  2e531388493c25d8 52-58
+src/routes/chat.rs
+  2e531388493c25d8 65-69,73,142-161,163-171,276,312-314,318
+src/lib.rs
+  2e531388493c25d8 3,10,62,69-71
+src/routes/export.rs
+  2e531388493c25d8 1-286
+web/src/components/VoiceRecorder.tsx
+  2e531388493c25d8 1,8-13,17-18,22-65,100,161,169-186,213-227,230,232,236,243-244,247,249,253
+web/src/App.tsx
+  2e531388493c25d8 19-25
+src/routes/usage.rs
+  2e531388493c25d8 1-36
+src/main.rs
+  2e531388493c25d8 7,28-34,107-109
+src/db/migrations.rs
+  2e531388493c25d8 73-89,124-131
+src/background/auto_org.rs
+  2e531388493c25d8 39-43,47,147-149,219-245
+src/db/queries.rs
+  2e531388493c25d8 155-165,462-537
+web/src/index.css
+  2e531388493c25d8 53-122,131
+web/src/components/Settings.tsx
+  2e531388493c25d8 2,72-79,86-89,91-92,144-171,182-220,245-260
+docs/plans/batch-5-features.md
+  2e531388493c25d8 1-230
+src/mcp.rs
+  2e531388493c25d8 1-160
+src/routes/mod.rs
+  2e531388493c25d8 3,8
+web/src/api.ts
+  2e531388493c25d8 133-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "06596b8ca3317ed1180ff22001e4d608b2596712",
+  "prompts": {
+    "2e531388493c25d8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b349cf56-d689-4d3c-832e-77bab514418d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 1216,
+      "total_deletions": 19,
+      "accepted_lines": 1212,
+      "overriden_lines": 0
+    }
+  }
+}
