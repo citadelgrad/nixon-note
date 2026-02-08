@@ -1,0 +1,25 @@
+web/src/components/NoteCard.tsx
+  2d52d2fd2157d7fd 191-194,196
+web/src/index.css
+  2d52d2fd2157d7fd 27,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "4951ed8649d1528a8f9b2161d43f74759eade5bb",
+  "prompts": {
+    "2d52d2fd2157d7fd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd378b56-ad23-48ae-8151-1b3b18dbc530",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 1,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
