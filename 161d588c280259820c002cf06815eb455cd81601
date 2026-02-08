@@ -1,0 +1,27 @@
+src/routes/status.rs
+  2d52d2fd2157d7fd 1-145
+src/routes/mod.rs
+  2d52d2fd2157d7fd 5
+src/lib.rs
+  2d52d2fd2157d7fd 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "161d588c280259820c002cf06815eb455cd81601",
+  "prompts": {
+    "2d52d2fd2157d7fd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd378b56-ad23-48ae-8151-1b3b18dbc530",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 147,
+      "total_deletions": 0,
+      "accepted_lines": 147,
+      "overriden_lines": 0
+    }
+  }
+}
