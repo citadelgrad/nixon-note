@@ -1,0 +1,25 @@
+web/src/App.tsx
+  2d52d2fd2157d7fd 12,28,161-166
+web/src/components/WelcomeBack.tsx
+  2d52d2fd2157d7fd 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "7d22e5f4f132bc4ef01196ec348534a75b9729b6",
+  "prompts": {
+    "2d52d2fd2157d7fd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd378b56-ad23-48ae-8151-1b3b18dbc530",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 60,
+      "total_deletions": 0,
+      "accepted_lines": 60,
+      "overriden_lines": 0
+    }
+  }
+}
