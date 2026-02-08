@@ -1,0 +1,27 @@
+src/main.rs
+  84d27205efbe7ee0 75
+Makefile
+  84d27205efbe7ee0 32,48,56
+README.md
+  84d27205efbe7ee0 158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "6c7c973d724732ec73d6d318fb280794dbe49fd3",
+  "prompts": {
+    "84d27205efbe7ee0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72b5e861-dcf6-406e-93aa-1d47ee4a69db",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 6,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
