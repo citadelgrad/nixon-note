@@ -1,0 +1,27 @@
+web/src/components/Settings.tsx
+  2d52d2fd2157d7fd 1-168
+web/src/api.ts
+  2d52d2fd2157d7fd 101-125
+web/src/App.tsx
+  2d52d2fd2157d7fd 11,14,119-134,159-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "44aad883bb71dce4ca4b24395bd0fc0146edbdb6",
+  "prompts": {
+    "2d52d2fd2157d7fd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd378b56-ad23-48ae-8151-1b3b18dbc530",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 214,
+      "total_deletions": 2,
+      "accepted_lines": 214,
+      "overriden_lines": 0
+    }
+  }
+}
