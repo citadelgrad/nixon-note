@@ -1,0 +1,31 @@
+web/vite.config.ts
+  84d27205efbe7ee0 8,10
+src/routes/ingest.rs
+  84d27205efbe7ee0 330,333-335,338-348
+src/background/mod.rs
+  84d27205efbe7ee0 69
+src/background/embed.rs
+  84d27205efbe7ee0 8-9,52-58
+Makefile
+  84d27205efbe7ee0 1-262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "ef3bad1f362d03b7112fbaf5a543c39165a8d9c7",
+  "prompts": {
+    "84d27205efbe7ee0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72b5e861-dcf6-406e-93aa-1d47ee4a69db",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 326,
+      "total_deletions": 45,
+      "accepted_lines": 289,
+      "overriden_lines": 0
+    }
+  }
+}
