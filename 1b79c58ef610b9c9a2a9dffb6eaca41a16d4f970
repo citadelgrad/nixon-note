@@ -1,0 +1,37 @@
+extension/options.js
+  dac7926f785847f9 1-64
+docs/plans/2026-02-08-feat-browser-extension-clipper-plan.md
+  dac7926f785847f9 1-283
+extension/lib/clip.js
+  dac7926f785847f9 1-24
+extension/manifest.json
+  dac7926f785847f9 1-48
+extension/popup.html
+  dac7926f785847f9 1-58
+extension/popup.js
+  dac7926f785847f9 1-72
+extension/options.html
+  dac7926f785847f9 1-117
+extension/background.js
+  dac7926f785847f9 1-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "1b79c58ef610b9c9a2a9dffb6eaca41a16d4f970",
+  "prompts": {
+    "dac7926f785847f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6bfc3eda-15e8-4478-9ad8-b6f5d9921d53",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 957,
+      "total_deletions": 162,
+      "accepted_lines": 795,
+      "overriden_lines": 0
+    }
+  }
+}
