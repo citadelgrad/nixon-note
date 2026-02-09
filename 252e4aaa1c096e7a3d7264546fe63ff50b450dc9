@@ -1,0 +1,31 @@
+Cargo.toml
+  1ea71e5450994640 71
+web/src/components/NoteSidePanel.tsx
+  1ea71e5450994640 1,72-106,191,193
+web/src/components/NoteCard.tsx
+  1ea71e5450994640 79-119,447
+Makefile
+  1ea71e5450994640 19,23-29,40,56,64,229-230
+src/routes/ingest.rs
+  1ea71e5450994640 431-433,435-436,777-925
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "252e4aaa1c096e7a3d7264546fe63ff50b450dc9",
+  "prompts": {
+    "1ea71e5450994640": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "51a18471-d451-4af5-a1c6-530304291962",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 261,
+      "total_deletions": 47,
+      "accepted_lines": 249,
+      "overriden_lines": 0
+    }
+  }
+}
