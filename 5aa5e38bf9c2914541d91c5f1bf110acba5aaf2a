@@ -1,0 +1,27 @@
+src/routes/chat.rs
+  da5214b8812c1a7e 151,167
+src/background/tts.rs
+  da5214b8812c1a7e 429
+src/db/queries.rs
+  da5214b8812c1a7e 686
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.1",
+  "base_commit_sha": "5aa5e38bf9c2914541d91c5f1bf110acba5aaf2a",
+  "prompts": {
+    "da5214b8812c1a7e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "11168da4-cf79-4678-b87b-790fbf7f3d7d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 6,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
