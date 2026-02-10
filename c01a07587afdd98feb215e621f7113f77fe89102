@@ -1,0 +1,25 @@
+Makefile
+  da5214b8812c1a7e 32,34-38,41-54,58-60,63-68,70-113,267,318-322,324-327
+.gitignore
+  da5214b8812c1a7e 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.1",
+  "base_commit_sha": "c01a07587afdd98feb215e621f7113f77fe89102",
+  "prompts": {
+    "da5214b8812c1a7e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "11168da4-cf79-4678-b87b-790fbf7f3d7d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 91,
+      "total_deletions": 35,
+      "accepted_lines": 86,
+      "overriden_lines": 0
+    }
+  }
+}
