@@ -1,0 +1,33 @@
+web/src/components/NoteCard.tsx
+  bbcd92d4f3cc040a 255
+extension/background.js
+  bbcd92d4f3cc040a 1,28,30
+extension/lib/clip.js
+  bbcd92d4f3cc040a 4,13-17
+src/routes/ingest.rs
+  bbcd92d4f3cc040a 489-798,851-855,1280-1407
+extension/popup.js
+  bbcd92d4f3cc040a 30-31,36-37
+extension/popup.html
+  bbcd92d4f3cc040a 53-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "b48f8ea827e7375703e01f6432422d5fbc00068b",
+  "prompts": {
+    "bbcd92d4f3cc040a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a210cef-0463-4d85-b3ff-13217e8756b4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 633,
+      "total_deletions": 174,
+      "accepted_lines": 465,
+      "overriden_lines": 0
+    }
+  }
+}
