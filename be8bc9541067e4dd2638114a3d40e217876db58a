@@ -1,0 +1,70 @@
+src/lib.rs
+  37f5ceca45079e87 93-96
+src/main.rs
+  37f5ceca45079e87 64
+src/routes/audio.rs
+  37f5ceca45079e87 5,9,300,330,339-354,359-360,367-398
+  d97198985e540b83 169-187
+web/src/components/ChatInterface.tsx
+  d97198985e540b83 86-87
+  37f5ceca45079e87 76
+web/src/components/AudioPlayer.tsx
+  37f5ceca45079e87 11-12,26-27,55,58,63-69,71-76,83,85-86,88-98,102-105,110,125-138,140,175,187-199,218-231,238-241,243-244,258-280
+src/routes/chat_stream.rs
+  d97198985e540b83 221-223,225
+web/src/components/__tests__/ChatInterface.test.tsx
+  37f5ceca45079e87 206
+web/src/components/NoteCard.tsx
+  d97198985e540b83 244-246,259-261
+  37f5ceca45079e87 123,240-241,258,262-264
+src/background/tts.rs
+  d97198985e540b83 271-272,309-310,485-494
+web/src/components/Settings.tsx
+  d97198985e540b83 25-28,183-197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "be8bc9541067e4dd2638114a3d40e217876db58a",
+  "prompts": {
+    "37f5ceca45079e87": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a522265-b4f8-427e-b4e9-179fd5666aab",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 196,
+      "total_deletions": 38,
+      "accepted_lines": 188,
+      "overriden_lines": 0
+    },
+    "6699bf4162ea80c5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9183c4a-2a3b-4182-a3d4-8af315716363",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 729,
+      "total_deletions": 0,
+      "accepted_lines": 729,
+      "overriden_lines": 0
+    },
+    "d97198985e540b83": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dbbfe682-7857-47de-afc4-3cbb33a6dbf3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 64,
+      "total_deletions": 14,
+      "accepted_lines": 64,
+      "overriden_lines": 0
+    }
+  }
+}
