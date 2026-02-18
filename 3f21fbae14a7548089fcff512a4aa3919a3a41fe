@@ -1,0 +1,25 @@
+web/src/components/__tests__/CaptureInput.test.tsx
+  dd49d0fe1ef78af4 1-156
+web/src/components/CaptureInput.tsx
+  dd49d0fe1ef78af4 157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "3f21fbae14a7548089fcff512a4aa3919a3a41fe",
+  "prompts": {
+    "dd49d0fe1ef78af4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3b446e5-8329-4c1e-8223-fea558664bb8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 157,
+      "total_deletions": 1,
+      "accepted_lines": 157,
+      "overriden_lines": 0
+    }
+  }
+}
