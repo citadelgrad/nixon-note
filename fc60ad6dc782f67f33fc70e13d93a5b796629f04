@@ -1,0 +1,29 @@
+Makefile
+  9be8a3b08318fcc6 228-232,234-260
+com.scott.note-backup.plist
+  9be8a3b08318fcc6 1-36
+web/src/components/CaptureInput.tsx
+  9be8a3b08318fcc6 1,12-29,42,46-49,56-59,68-72,84,98,107,113-114,171,189,248,262
+bin/note-backup
+  9be8a3b08318fcc6 1-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "fc60ad6dc782f67f33fc70e13d93a5b796629f04",
+  "prompts": {
+    "9be8a3b08318fcc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "12c3553c-0d8e-4ce2-bb10-6cf272012a67",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "messages": [],
+      "total_additions": 205,
+      "total_deletions": 19,
+      "accepted_lines": 197,
+      "overriden_lines": 0
+    }
+  }
+}
