@@ -1,0 +1,23 @@
+src/background/auto_org.rs
+  c2bec2bc19f55dd5 189-199,202,244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "424631929547dbfe250abf31e65c3d8d3da59f83",
+  "prompts": {
+    "c2bec2bc19f55dd5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88e0e199-6630-421f-91ba-e8c16bfaa045",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 16,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
