@@ -1,0 +1,25 @@
+src/routes/chat.rs
+  94ca5181a768aa11 50-56,62,88,219,270
+src/routes/notes.rs
+  94ca5181a768aa11 448,549
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "2949cebe7d9055215b9c5128d816f9555982944c",
+  "prompts": {
+    "94ca5181a768aa11": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "981ce92b-97f4-4793-bc9d-4a20110e50e7",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 20,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
