@@ -1,0 +1,23 @@
+src/routes/voice.rs
+  d4d87e20839bfe9d 109-117,121,139,156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "c7b4210dd08e75b2a854c124da036761028c4895",
+  "prompts": {
+    "d4d87e20839bfe9d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c95c9e31-2ee8-4550-8638-26fba8080d24",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 19,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}
