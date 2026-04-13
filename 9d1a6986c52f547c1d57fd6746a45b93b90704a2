@@ -1,0 +1,36 @@
+.beads/.gitignore
+  0d732c10b230c85c 1-3,5,7,21-23,25-31,35-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "9d1a6986c52f547c1d57fd6746a45b93b90704a2",
+  "prompts": {
+    "0d732c10b230c85c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019c968b-b2c3-7301-9080-0fcae8839f06",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 760,
+      "overriden_lines": 0
+    },
+    "3f40977c8e5daa18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6b7e57c-d026-4f16-a0a3-8e755b10cd9f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}
