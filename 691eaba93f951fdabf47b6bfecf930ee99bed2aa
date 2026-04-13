@@ -1,0 +1,23 @@
+src/routes/notes.rs
+  dacc80cf00e866ce 125,137,150,359
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "691eaba93f951fdabf47b6bfecf930ee99bed2aa",
+  "prompts": {
+    "dacc80cf00e866ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ed5fb3ae-7952-4ba3-b5b3-993d4098a664",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 9,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
