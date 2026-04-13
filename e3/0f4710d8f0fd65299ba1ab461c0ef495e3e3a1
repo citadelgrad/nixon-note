@@ -1,0 +1,23 @@
+src/routes/audio.rs
+  5d123805296daaaf 205,207-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "e30f4710d8f0fd65299ba1ab461c0ef495e3e3a1",
+  "prompts": {
+    "5d123805296daaaf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ced8095-f8b5-4979-9ecd-db668d175a4b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 8,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
