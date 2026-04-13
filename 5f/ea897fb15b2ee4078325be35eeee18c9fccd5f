@@ -1,0 +1,25 @@
+src/routes/notes.rs
+  bcf7952f05cd2598 137-142
+src/routes/chat_stream.rs
+  bcf7952f05cd2598 71-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "5fea897fb15b2ee4078325be35eeee18c9fccd5f",
+  "prompts": {
+    "bcf7952f05cd2598": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "375cbeb1-ce61-4265-b43e-b91d01661d8f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 2,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
