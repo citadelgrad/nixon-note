@@ -1,0 +1,51 @@
+web/src/api.ts
+  4fab8c7b8386bfcf 87-100
+Cargo.toml
+  4fab8c7b8386bfcf 48-51
+src/db/queries.rs
+  4fab8c7b8386bfcf 49-56
+src/routes/notes.rs
+  d5b49e1d8a7d250e 17-28,99,101-123,148-152,155-216,219-227
+  4fab8c7b8386bfcf 100
+web/src/components/CaptureInput.tsx
+  4fab8c7b8386bfcf 3-6,9,11,15,22-24,43,53,64-66,77-103,142,163-165,167,173-174,215,240-244,249-250
+src/routes/ingest.rs
+  4fab8c7b8386bfcf 278-329,331-332,334-335,339-416
+web/src/App.tsx
+  4246e3f5e5c3ea69 10,25,242,250,256,278-286,73
+  4fab8c7b8386bfcf 11,24,61-65,67-72,148,271
+src/lib.rs
+  d5b49e1d8a7d250e 51
+  4fab8c7b8386bfcf 65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "5cbcda6a89e76b2971fe0babb910124ee06b4123",
+  "prompts": {
+    "4246e3f5e5c3ea69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7680339-7493-4fe5-9783-1eac43f12ff5",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "total_additions": 62,
+      "total_deletions": 44,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "4fab8c7b8386bfcf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2758302-af77-4f82-858f-efc4cf62faec",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "total_additions": 306,
+      "total_deletions": 75,
+      "accepted_lines": 234,
+      "overriden_lines": 0
+    }
+  }
+}

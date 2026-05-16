@@ -1,0 +1,28 @@
+web/src/App.tsx
+  4246e3f5e5c3ea69 10,24,228,236,242,264-272
+web/src/components/DailyDigest.tsx
+  4246e3f5e5c3ea69 8,17,47
+web/src/components/NoteSidePanel.tsx
+  4246e3f5e5c3ea69 1-287
+web/src/components/NoteCard.tsx
+  4246e3f5e5c3ea69 15-16,78,85,87,99-100,104,106,301-303,308-309,317-336,338-365,367-371
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "a23352f95f20244db89ae3116ff7fd5191319be2",
+  "prompts": {
+    "4246e3f5e5c3ea69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7680339-7493-4fe5-9783-1eac43f12ff5",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "total_additions": 387,
+      "total_deletions": 16,
+      "accepted_lines": 371,
+      "overriden_lines": 0
+    }
+  }
+}

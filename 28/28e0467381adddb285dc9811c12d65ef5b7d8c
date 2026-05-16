@@ -1,0 +1,35 @@
+web/src/components/NoteCard.tsx
+  4246e3f5e5c3ea69 15-16,78,85,87,99-100,104,116,311-313,320-321,329-348,350-377,379-383,111-115,314-318
+  a1437573b2ee42ca 109-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "2828e0467381adddb285dc9811c12d65ef5b7d8c",
+  "prompts": {
+    "4246e3f5e5c3ea69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7680339-7493-4fe5-9783-1eac43f12ff5",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "total_additions": 62,
+      "total_deletions": 44,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    },
+    "a1437573b2ee42ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9dd66375-4b15-4134-91dd-2404ba4310ed",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Scott Nixon <citadelgrad@gmail.com>",
+      "total_additions": 3,
+      "total_deletions": 9,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
