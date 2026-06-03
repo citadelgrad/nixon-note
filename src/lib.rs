@@ -39,11 +39,8 @@ async fn auth_middleware(req: Request, next: Next) -> Result<Response, StatusCod
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
 
-    match auth_header {
-        Some(val)
-            if val.starts_with("Bearer ")
-                && bool::from(val.as_bytes()[7..].ct_eq(token.as_bytes())) =>
-        {
+    match auth_header.and_then(|val| val.strip_prefix("Bearer ")) {
+        Some(bearer_token) if bool::from(bearer_token.as_bytes().ct_eq(token.as_bytes())) => {
             Ok(next.run(req).await)
         }
         _ => Err(StatusCode::UNAUTHORIZED),
