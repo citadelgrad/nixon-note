@@ -2,6 +2,8 @@
 
 NixonNote is designed for local-first, self-hosted use.
 
+Embeddings and voice transcription are intentionally local: Ollama handles note/query embeddings and `simple_transcribe_rs` runs Whisper on-device. Provider API keys are only needed for optional higher-level features such as auto-organization, chat, and TTS.
+
 ## Supported use
 
 - Run on localhost, a private LAN, or a private overlay network such as Tailscale.

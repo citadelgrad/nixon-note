@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Setup script for AI features (Osaurus, Ollama, Claude)
+# Setup script for AI features (local Whisper, Ollama, Claude)
 #
 
 set -euo pipefail
@@ -20,18 +20,20 @@ log_warn() {
 echo "=== Note AI Services Setup ==="
 echo ""
 
-# 1. Check Osaurus
-echo "1. Voice Transcription (Osaurus)"
-if pgrep -f "osaurus.*8080" > /dev/null; then
-    log_info "Osaurus is running on port 8080"
+# 1. Check local Whisper prerequisites
+echo "1. Voice Transcription (local Whisper via simple_transcribe_rs)"
+if command -v ffmpeg &> /dev/null || [[ -x /opt/homebrew/bin/ffmpeg ]]; then
+    log_info "ffmpeg is available for browser audio conversion"
 else
-    log_warn "Osaurus is NOT running"
-    echo "   Start with: osaurus --port 8080 &"
+    log_warn "ffmpeg is not installed"
+    echo "   Install with: brew install ffmpeg"
 fi
+echo "   Whisper models are downloaded automatically on first transcription."
+echo "   Optional env: WHISPER_MODEL_SIZE=medium, WHISPER_MODEL_DIR=~/.cache/whisper"
 echo ""
 
 # 2. Check Ollama
-echo "2. Embeddings (Ollama)"
+echo "2. Embeddings (local Ollama)"
 if command -v ollama &> /dev/null; then
     if ollama list | grep -q "nomic-embed-text"; then
         log_info "Ollama and nomic-embed-text model are ready"
@@ -52,7 +54,7 @@ if grep -q "ANTHROPIC_API_KEY" ~/Library/LaunchAgents/com.scott.note.plist | gre
 else
     log_warn "Claude API key not configured"
     echo "   1. Get API key from: https://console.anthropic.com/"
-    echo "   2. Edit com.scott.note.plist and uncomment ANTHROPIC_API_KEY"
+    echo "   2. Edit com.scott.note.plist and set ANTHROPIC_API_KEY"
     echo "   3. Run: ./service.sh reload"
 fi
 echo ""

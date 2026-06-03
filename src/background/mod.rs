@@ -94,7 +94,7 @@ async fn process_note(client: &reqwest::Client, pool: &Pool, note_id: i64) -> Re
         warn!(
             note_id,
             error = ?e,
-            "Failed to retry transcription (Osaurus may be unavailable)"
+            "Failed to retry transcription (local Whisper may be unavailable)"
         );
         // Continue to other processing steps
     }

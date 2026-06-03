@@ -48,11 +48,12 @@ RUST_LOG=note=info
 # Without this: Search falls back to full-text search only (FTS5)
 # OLLAMA_URL=http://localhost:11434
 
-# ===== OSAURUS (LOCAL VOICE TRANSCRIPTION) =====
-# Used for: Converting voice recordings to text
-# Setup: pip install osaurus && osaurus --port 8080
-# Without this: Voice files are saved but not transcribed
-# OSAURUS_URL=http://localhost:8080
+# ===== LOCAL WHISPER TRANSCRIPTION =====
+# Used for: Converting voice recordings to text on-device via simple_transcribe_rs
+# Setup: brew install ffmpeg. Whisper models download automatically on first use.
+# Without this: Voice files are saved for retry until local transcription succeeds.
+# WHISPER_MODEL_SIZE=medium
+# WHISPER_MODEL_DIR=~/.cache/whisper
 
 # Litestream Configuration (optional, for S3 backup)
 # LITESTREAM_BUCKET=your-bucket-name

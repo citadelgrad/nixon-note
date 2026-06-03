@@ -17,7 +17,7 @@ use crate::routes::notes::{AppError, flatten_interact};
 // - WHISPER_MODEL_SIZE: Model size - tiny, base, small, medium, large (default: medium)
 
 /// POST /api/voice
-/// Accepts audio file, transcribes via Osaurus Whisper, saves as note
+/// Accepts audio file, transcribes with local Whisper, saves as note
 pub async fn transcribe_voice(
     State(state): State<AppState>,
     mut multipart: Multipart,
@@ -53,12 +53,12 @@ pub async fn transcribe_voice(
         "Received audio for transcription"
     );
 
-    // Call Osaurus Whisper API
+    // Transcribe locally with Whisper
     let (transcription, audio_saved) =
         match transcribe_with_whisper(&audio_bytes, filename.as_deref()).await {
             Ok(text) => (text, false),
             Err(e) => {
-                warn!(error = ?e, "Osaurus transcription failed, will retry in background");
+                warn!(error = ?e, "Local Whisper transcription failed, will retry in background");
                 // Graceful degradation: save note with pending status
                 ("[Voice memo - transcribing...]".to_string(), true)
             }
@@ -166,7 +166,7 @@ pub async fn retry_pending_transcription(
             Ok(())
         }
         Err(e) => {
-            // Osaurus still unavailable, keep audio for next retry
+            // Local Whisper still unavailable, keep audio for next retry
             Err(e)
         }
     }

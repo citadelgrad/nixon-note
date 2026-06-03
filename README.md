@@ -14,7 +14,7 @@ It is meant to run locally on your own machine or private network. Do not host i
 - **AI auto-organization** - Claude API tags and summarizes automatically
 - **Powerful search** - Full-text search (FTS5) + vector similarity (sqlite-vec)
 - **Local-first** - SQLite database, runs entirely on your machine
-- **Voice transcription** - Osaurus (Whisper) for local speech-to-text
+- **Voice transcription** - Local Whisper via `simple_transcribe_rs` for speech-to-text
 - **Background processing** - Async embedding generation and auto-organization
 
 ## Setup
@@ -42,7 +42,7 @@ Configure these for enhanced features:
    - Pull model: `ollama pull nomic-embed-text`
    - Will auto-connect to `http://localhost:11434`
 
-All AI features are optional and the app will function without them.
+Embeddings and transcription are local by design. Cloud APIs are optional and only used for higher-level language features such as auto-organization, chat, and TTS.
 
 ## Quick Start
 
@@ -156,7 +156,7 @@ Edit your LaunchAgent plist or environment file to configure:
 |----------|-------------|------------|
 | `ANTHROPIC_API_KEY` | Claude API for auto-tagging and summarization | [Get key at console.anthropic.com](https://console.anthropic.com/) |
 | `GEMINI_API_KEY` | Gemini API for conversational chat | [Get key at aistudio.google.com](https://aistudio.google.com/apikey) |
-| `OLLAMA_URL` | Ollama endpoint for local embeddings | Default: `http://localhost:11434`. [Install Ollama](https://ollama.ai/), then run `ollama pull nomic-embed-text` |
+| `OLLAMA_URL` | Ollama endpoint for local embeddings | Default: `http://localhost:11434`. Uses `nomic-embed-text`; keep the same model for all indexed notes unless you re-embed everything. |
 
 **Note**: All AI features are optional and will gracefully degrade if not configured. The app will still function for basic note capture and search.
 
@@ -178,6 +178,17 @@ To enable authentication, set `NOTE_TOKEN` in your environment or LaunchAgent co
 All API requests will then require an `Authorization` header with your bearer token.
 
 Do not expose NixonNote to the public internet without `NOTE_TOKEN` and a trusted network boundary such as Tailscale or a reverse proxy with authentication. The only unauthenticated API endpoint is `/api/status`.
+
+## Local AI decisions
+
+NixonNote intentionally keeps the two high-volume, privacy-sensitive AI paths local:
+
+- **Embeddings run locally through Ollama** using `nomic-embed-text`. Notes and search queries are embedded on your machine, then stored/searched in sqlite-vec. This keeps routine indexing cheap, avoids sending every note to an embedding API, and preserves one consistent 768-dimensional vector space. If you change embedding models, re-embed all notes; mixing models makes vector search garbage.
+- **Voice transcription runs locally through Whisper** using `simple_transcribe_rs`. Browser recordings are converted with ffmpeg and transcribed on-device. Whisper models download into `WHISPER_MODEL_DIR` on first use, with `WHISPER_MODEL_SIZE=medium` by default. This avoids uploading raw voice memos to a third-party transcription service.
+- **Cloud LLMs are used only where they add higher-level reasoning or generation.** Claude handles auto-tagging/summarization, Gemini handles chat, and OpenAI/Gemini/ElevenLabs can be used for TTS. Those are optional and degrade gracefully when keys are missing.
+
+The guiding tradeoff is simple: local for personal data plumbing and repeated background work; cloud only for optional synthesis/generation features where local models were not the goal of this personal build.
+
 
 ## Development
 
@@ -375,7 +386,7 @@ curl -X POST http://localhost:9999/api/notes/batch \
 | Async pool | deadpool-sqlite | Bridge between sync rusqlite and async Axum |
 | Migrations | rusqlite_migration | Lightweight, uses `user_version` pragma |
 | Local embeddings | Ollama (nomic-embed-text) | 768-dim embeddings, runs on Apple Silicon |
-| Local transcription | Osaurus (Whisper) | Apple Silicon optimized, OpenAI-compatible API |
+| Local transcription | `simple_transcribe_rs` + Whisper | On-device transcription; ffmpeg converts browser audio to 16 kHz mono WAV first |
 | Auto-org LLM | Claude API (Sonnet) | Structured output via `tool_use` |
 | Frontend | React + Vite + Tailwind | Minimal stack, fast HMR |
 
@@ -425,7 +436,7 @@ User Question
 When a note is created, a background job:
 1. Combines the note's title, content, and AI-generated summary
 2. Truncates to 8,000 characters (model's context limit)
-3. Sends to Ollama's `/api/embed` endpoint
+3. Sends to Ollama's `/api/embed` endpoint (`OLLAMA_URL`, default `http://localhost:11434`)
 4. Stores the resulting 768-dim float vector in the `note_embeddings` table via sqlite-vec
 
 ### Search Flow
@@ -516,8 +527,7 @@ SQLite uses WAL mode with `busy_timeout = 5000ms`. If you see "database is locke
 ## Documentation
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide
-- [AGENTS.md](AGENTS.md) - Agent workflows and automation
-- [docs/plans/](docs/plans/) - Implementation plans and milestones
+- [SECURITY.md](SECURITY.md) - Local-first security guidance
 
 ## Project Structure
 

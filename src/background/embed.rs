@@ -3,10 +3,17 @@ use deadpool_sqlite::Pool;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-const OLLAMA_URL: &str = "http://localhost:11434";
+const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
 const MODEL: &str = "nomic-embed-text";
 // nomic-embed-text has an 8192-token context window; markdown/code tokenizes ~3-4 chars/token
 const MAX_EMBED_CHARS: usize = 6000;
+
+fn ollama_url() -> String {
+    std::env::var("OLLAMA_URL")
+        .unwrap_or_else(|_| DEFAULT_OLLAMA_URL.to_string())
+        .trim_end_matches('/')
+        .to_string()
+}
 
 #[derive(Serialize)]
 struct EmbedRequest {
@@ -77,7 +84,7 @@ pub async fn generate_embedding(client: &reqwest::Client, text: &str) -> Result<
     };
 
     let res = client
-        .post(format!("{}/api/embed", OLLAMA_URL))
+        .post(format!("{}/api/embed", ollama_url()))
         .json(&req)
         .send()
         .await
@@ -114,10 +121,11 @@ pub async fn generate_embedding(client: &reqwest::Client, text: &str) -> Result<
 /// Check if Ollama is available
 #[allow(dead_code)]
 pub async fn check_ollama(client: &reqwest::Client) -> bool {
-    match client.get(format!("{}/api/tags", OLLAMA_URL)).send().await {
+    let url = ollama_url();
+    match client.get(format!("{url}/api/tags")).send().await {
         Ok(res) if res.status().is_success() => true,
         _ => {
-            warn!("Ollama is not available at {}", OLLAMA_URL);
+            warn!("Ollama is not available at {}", url);
             false
         }
     }
@@ -149,11 +157,9 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        // Override OLLAMA_URL for test (would need to make it configurable or use test server)
         let client = reqwest::Client::new();
 
         // For now, we'll test the response parsing logic by calling with mock server URL
-        // In a real setup, we'd make OLLAMA_URL configurable via env var
 
         // Test that API structure matches expectations
         let req = EmbedRequest {
