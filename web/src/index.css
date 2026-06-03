@@ -1,0 +1,502 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  /* Warm green palette — ADHD-friendly, avoids blue-spectrum */
+  --color-sage-50: #f6f7f4;
+  --color-sage-100: #e8ebe3;
+  --color-sage-200: #d1d7c8;
+  --color-sage-300: #adb8a0;
+  --color-sage-400: #8a9a78;
+  --color-sage-500: #6b7d5a;
+  --color-sage-600: #546445;
+  --color-sage-700: #434f38;
+  --color-sage-800: #384130;
+  --color-sage-900: #2f3629;
+
+  /* Warm cream background */
+  --color-cream-50: #fefdfb;
+  --color-cream-100: #faf6ef;
+  --color-cream-200: #f3ebdd;
+
+  /* Muted error — informs, doesn't punish */
+  --color-muted-red: #c27a6b;
+
+  /* Warm color palette for tag chips (ADHD-friendly, no blue) */
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-700: #b45309;
+
+  --color-orange-100: #ffedd5;
+  --color-orange-700: #c2410c;
+
+  --color-teal-200: #99f6e4;
+
+  --color-rose-100: #ffe4e6;
+  --color-rose-400: #fb7185;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+
+  --color-emerald-100: #d1fae5;
+  --color-emerald-700: #047857;
+
+  --color-teal-100: #ccfbf1;
+  --color-teal-700: #0f766e;
+
+  --color-lime-100: #ecfccb;
+  --color-lime-700: #4d7c0f;
+
+  --color-yellow-100: #fef9c3;
+  --color-yellow-700: #a16207;
+
+  --font-sans: "Lexend", system-ui, sans-serif;
+}
+
+/* Semantic theme variables using @theme inline */
+@theme inline {
+  --color-theme-bg: var(--theme-bg);
+  --color-theme-bg-secondary: var(--theme-bg-secondary);
+  --color-theme-surface: var(--theme-surface);
+  --color-theme-text: var(--theme-text);
+  --color-theme-text-secondary: var(--theme-text-secondary);
+  --color-theme-text-muted: var(--theme-text-muted);
+  --color-theme-accent: var(--theme-accent);
+  --color-theme-accent-hover: var(--theme-accent-hover);
+  --color-theme-border: var(--theme-border);
+  --color-theme-border-secondary: var(--theme-border-secondary);
+}
+
+/* Default theme: Sage (existing colors) */
+:root, [data-theme="sage"] {
+  --theme-bg: #fefdfb;
+  --theme-bg-secondary: #f6f7f4;
+  --theme-surface: #ffffff;
+  --theme-text: #2f3629;
+  --theme-text-secondary: #384130;
+  --theme-text-muted: #8a9a78;
+  --theme-accent: #546445;
+  --theme-accent-hover: #434f38;
+  --theme-border: #e8ebe3;
+  --theme-border-secondary: #d1d7c8;
+}
+
+/* Desert theme */
+[data-theme="desert"] {
+  --theme-bg: #fdf8f3;
+  --theme-bg-secondary: #f5ede4;
+  --theme-surface: #ffffff;
+  --theme-text: #3d2e1f;
+  --theme-text-secondary: #5c4a3a;
+  --theme-text-muted: #a08b76;
+  --theme-accent: #8b6914;
+  --theme-accent-hover: #6d5110;
+  --theme-border: #e8ddd0;
+  --theme-border-secondary: #d4c4b0;
+}
+
+/* Sunset theme */
+[data-theme="sunset"] {
+  --theme-bg: #fef7f4;
+  --theme-bg-secondary: #fceee8;
+  --theme-surface: #ffffff;
+  --theme-text: #3b2622;
+  --theme-text-secondary: #5c3d35;
+  --theme-text-muted: #b07d6e;
+  --theme-accent: #c05234;
+  --theme-accent-hover: #a04428;
+  --theme-border: #f0d8cf;
+  --theme-border-secondary: #e4c4b8;
+}
+
+/* Forest theme */
+[data-theme="forest"] {
+  --theme-bg: #f5f7f2;
+  --theme-bg-secondary: #e8ede0;
+  --theme-surface: #ffffff;
+  --theme-text: #1e2b18;
+  --theme-text-secondary: #2d3f24;
+  --theme-text-muted: #6b8258;
+  --theme-accent: #3d6b2e;
+  --theme-accent-hover: #2d5020;
+  --theme-border: #c8d8ba;
+  --theme-border-secondary: #b0c49e;
+}
+
+html {
+  font-size: 18px;
+}
+
+body {
+  @apply bg-cream-50 text-sage-900 antialiased;
+  line-height: 1.6;
+  margin: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom prose styles for markdown - comprehensive styling */
+.prose {
+  --tw-prose-body: var(--color-sage-800);
+  --tw-prose-headings: var(--color-sage-900);
+  --tw-prose-links: var(--color-sage-600);
+  --tw-prose-bold: var(--color-sage-900);
+  --tw-prose-code: var(--color-sage-700);
+  --tw-prose-pre-bg: var(--color-sage-50);
+  --tw-prose-quotes: var(--color-sage-700);
+  color: var(--color-sage-800);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* Headings with proper hierarchy */
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: var(--color-sage-900);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+  letter-spacing: -0.01em;
+}
+
+.prose h1 {
+  font-size: 1.75em;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 1em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--color-sage-100);
+}
+
+.prose h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 1.5em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--color-sage-100);
+}
+
+.prose h3 {
+  font-size: 1.25em;
+  margin-top: 1.25em;
+}
+
+.prose h4 {
+  font-size: 1.1em;
+  margin-top: 1.25em;
+}
+
+.prose h5,
+.prose h6 {
+  font-size: 1em;
+  margin-top: 1em;
+}
+
+/* First element no margin */
+.prose > :first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.prose p {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+/* Strong emphasis */
+.prose strong,
+.prose b {
+  font-weight: 600;
+  color: var(--color-sage-900);
+}
+
+/* Italic emphasis */
+.prose em,
+.prose i {
+  font-style: italic;
+  color: var(--color-sage-700);
+}
+
+/* Links */
+.prose a {
+  color: var(--color-sage-600);
+  text-decoration: underline;
+  text-decoration-color: var(--color-sage-300);
+  text-underline-offset: 2px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.prose a:hover {
+  color: var(--color-sage-700);
+  text-decoration-color: var(--color-sage-500);
+}
+
+/* Lists */
+.prose ul,
+.prose ol {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-left: 1.75em;
+}
+
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ol {
+  list-style-type: decimal;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  padding-left: 0.375em;
+}
+
+.prose li > p {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+/* Nested lists */
+.prose ul ul,
+.prose ul ol,
+.prose ol ul,
+.prose ol ol {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose ul ul {
+  list-style-type: circle;
+}
+
+.prose ul ul ul {
+  list-style-type: square;
+}
+
+/* Inline code */
+.prose code {
+  background-color: var(--color-sage-50);
+  padding: 0.2em 0.4em;
+  border-radius: 0.3em;
+  font-size: 0.875em;
+  color: var(--color-sage-700);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-weight: 400;
+  border: 1px solid var(--color-sage-100);
+}
+
+/* Code blocks */
+.prose pre {
+  background-color: var(--color-sage-50);
+  border: 1px solid var(--color-sage-100);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  overflow-x: auto;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  line-height: 1.6;
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875em;
+  color: var(--color-sage-800);
+  border: none;
+  font-weight: 400;
+}
+
+/* Blockquotes */
+.prose blockquote {
+  border-left: 4px solid var(--color-sage-300);
+  padding-left: 1.25em;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  font-style: italic;
+  color: var(--color-sage-700);
+}
+
+.prose blockquote p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* Horizontal rules */
+.prose hr {
+  border: none;
+  border-top: 2px solid var(--color-sage-100);
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+/* Tables */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  font-size: 0.9em;
+}
+
+.prose thead {
+  border-bottom: 2px solid var(--color-sage-200);
+}
+
+.prose thead th {
+  padding: 0.75em 1em;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-sage-900);
+  background-color: var(--color-sage-50);
+}
+
+.prose tbody tr {
+  border-bottom: 1px solid var(--color-sage-100);
+}
+
+.prose tbody tr:last-child {
+  border-bottom: none;
+}
+
+.prose tbody td {
+  padding: 0.75em 1em;
+}
+
+/* Task lists (GFM) */
+.prose input[type="checkbox"] {
+  margin-right: 0.5em;
+  cursor: pointer;
+}
+
+/* Images */
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+/* Figure captions */
+.prose figcaption {
+  text-align: center;
+  font-size: 0.875em;
+  color: var(--color-sage-500);
+  margin-top: 0.75em;
+  font-style: italic;
+}
+
+/* Syntax highlighting customization */
+.prose .hljs {
+  background: var(--color-sage-50);
+  color: var(--color-sage-800);
+  padding: 0;
+}
+
+.prose .hljs-comment,
+.prose .hljs-quote {
+  color: var(--color-sage-400);
+  font-style: italic;
+}
+
+.prose .hljs-keyword,
+.prose .hljs-selector-tag,
+.prose .hljs-addition {
+  color: var(--color-sage-700);
+  font-weight: 600;
+}
+
+.prose .hljs-number,
+.prose .hljs-string,
+.prose .hljs-meta .hljs-string,
+.prose .hljs-literal,
+.prose .hljs-doctag,
+.prose .hljs-regexp {
+  color: var(--color-emerald-700);
+}
+
+.prose .hljs-title,
+.prose .hljs-section,
+.prose .hljs-name,
+.prose .hljs-selector-id,
+.prose .hljs-selector-class {
+  color: var(--color-sage-600);
+  font-weight: 600;
+}
+
+.prose .hljs-attribute,
+.prose .hljs-attr,
+.prose .hljs-variable,
+.prose .hljs-template-variable,
+.prose .hljs-class .hljs-title,
+.prose .hljs-type {
+  color: var(--color-teal-700);
+}
+
+.prose .hljs-symbol,
+.prose .hljs-bullet,
+.prose .hljs-subst,
+.prose .hljs-meta,
+.prose .hljs-meta .hljs-keyword,
+.prose .hljs-selector-attr,
+.prose .hljs-selector-pseudo,
+.prose .hljs-link {
+  color: var(--color-sage-600);
+}
+
+.prose .hljs-built_in,
+.prose .hljs-deletion {
+  color: var(--color-muted-red);
+}
+
+.prose .hljs-formula {
+  background: var(--color-sage-100);
+}
+
+.prose .hljs-emphasis {
+  font-style: italic;
+}
+
+.prose .hljs-strong {
+  font-weight: 700;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-sage-50);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-sage-300);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sage-400);
+}

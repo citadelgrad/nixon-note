@@ -1,0 +1,61 @@
+# Note Service Configuration
+# This file is for reference and development. For production service,
+# configure these variables in com.scott.note.plist instead.
+#
+# Copy this file to .env for development: cp .env.example .env
+
+# ===== CORE CONFIGURATION =====
+
+# Server Configuration
+NOTE_PORT=9999
+NOTE_DB=./note.db
+NOTE_WEB_DIR=./web/dist
+
+# Authentication (optional)
+# If set, all API requests must include: Authorization: Bearer <token>
+# If empty/unset, no authentication required (dev mode)
+# NOTE_TOKEN=your-secret-token-here
+
+# Logging
+RUST_LOG=note=info
+
+# ===== AI SERVICES (ALL OPTIONAL) =====
+# The app will function without these - features gracefully degrade
+
+# ===== ANTHROPIC CLAUDE API =====
+# Used for: Auto-tagging and summarization of notes
+# Get your key at: https://console.anthropic.com/
+# Without this: Notes won't be auto-tagged or summarized (manual tagging still works)
+# ANTHROPIC_API_KEY=your-anthropic-key
+
+# ===== GOOGLE GEMINI API =====
+# Used for: Conversational chat interface with your notes and optional Gemini TTS
+# Get your key at: https://aistudio.google.com/apikey
+# Without this: Chat and Gemini TTS won't work (search and browse still work)
+# GEMINI_API_KEY=your-gemini-api-key-here
+
+# ===== ELEVENLABS API =====
+# Used for: Business-grade text-to-speech audio generation
+# Get your key at: https://elevenlabs.io/app/settings/api-keys
+# Default TTS model is eleven_v3; override only if needed.
+# ELEVENLABS_API_KEY=your-elevenlabs-api-key-here
+# ELEVENLABS_TTS_MODEL=eleven_v3
+
+# ===== OLLAMA (LOCAL EMBEDDINGS) =====
+# Used for: Vector similarity search across notes
+# Install: https://ollama.ai/
+# Setup: ollama pull nomic-embed-text
+# Without this: Search falls back to full-text search only (FTS5)
+# OLLAMA_URL=http://localhost:11434
+
+# ===== OSAURUS (LOCAL VOICE TRANSCRIPTION) =====
+# Used for: Converting voice recordings to text
+# Setup: pip install osaurus && osaurus --port 8080
+# Without this: Voice files are saved but not transcribed
+# OSAURUS_URL=http://localhost:8080
+
+# Litestream Configuration (optional, for S3 backup)
+# LITESTREAM_BUCKET=your-bucket-name
+# LITESTREAM_ENDPOINT=https://s3.us-west-2.amazonaws.com
+# LITESTREAM_ACCESS_KEY_ID=your-access-key
+# LITESTREAM_SECRET_ACCESS_KEY=your-secret-key

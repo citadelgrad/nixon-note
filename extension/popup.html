@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 300px;
+      padding: 12px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      color: #1e293b;
+    }
+    #pageUrl {
+      color: #64748b;
+      font-size: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #clipBtn {
+      display: block;
+      width: 100%;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      background: #2563eb;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #clipBtn:hover { background: #1d4ed8; }
+    #clipBtn:disabled { background: #94a3b8; cursor: wait; }
+    #status {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+    #existingActions {
+      margin-top: 8px;
+      display: none;
+    }
+    #openExistingBtn {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #d97706;
+      background: #fff7ed;
+      color: #9a3412;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #openExistingBtn:hover { background: #ffedd5; }
+    .s-success { display: block; background: #dcfce7; color: #166534; }
+    .s-duplicate { display: block; background: #fef9c3; color: #854d0e; }
+    .s-error { display: block; background: #fee2e2; color: #991b1b; }
+    .s-unconfigured { display: block; background: #e0e7ff; color: #3730a3; }
+    .s-unconfigured a { color: inherit; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <form id="clipForm">
+    <div id="pageUrl"></div>
+    <button id="clipBtn" type="submit">Clip to NixonNote</button>
+    <div id="status"></div>
+    <div id="existingActions">
+      <button id="openExistingBtn" type="button">Open existing note</button>
+    </div>
+  </form>
+  <script src="popup.js"></script>
+</body>
+</html>

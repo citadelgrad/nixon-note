@@ -1,0 +1,86 @@
+#!/bin/bash
+# NixonNote automated backup script
+# Backs up SQLite database + audio files to iCloud Drive
+# Designed for launchd (runs twice daily)
+#
+# Retention policy:
+#   - Daily backups: kept for 90 days
+#   - Monthly backups (1st of month): kept forever
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BACKUP_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/__Business__/--Data-Migration--/nixonnote"
+DB_PATH="$PROJECT_DIR/note.db"
+AUDIO_DIR="$PROJECT_DIR/audio"
+STATE_FILE="$BACKUP_ROOT/.last-backup-hash"
+LOG_FILE="$HOME/Library/Logs/note.backup.log"
+DATE=$(date +%Y-%m-%d)
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+DAY_OF_MONTH=$(date +%d)
+RETENTION_DAYS=90
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+# Ensure backup directory exists
+mkdir -p "$BACKUP_ROOT"
+
+# Check if database exists
+if [ ! -f "$DB_PATH" ]; then
+  log "ERROR: Database not found at $DB_PATH"
+  exit 1
+fi
+
+# Check if database has changed since last backup (sha256 of main db file)
+CURRENT_HASH=$(shasum -a 256 "$DB_PATH" | cut -d' ' -f1)
+if [ -f "$STATE_FILE" ]; then
+  LAST_HASH=$(cat "$STATE_FILE")
+  if [ "$CURRENT_HASH" = "$LAST_HASH" ]; then
+    log "SKIP: Database unchanged since last backup"
+    exit 0
+  fi
+fi
+
+log "Starting backup..."
+
+# Create temp directory for staging
+STAGING=$(mktemp -d)
+trap 'rm -rf "$STAGING"' EXIT
+
+# Use sqlite3 .backup for safe WAL-mode backup
+BACKUP_DB="$STAGING/note.db"
+sqlite3 "$DB_PATH" ".backup '$BACKUP_DB'"
+log "Database backed up via sqlite3 .backup"
+
+# Copy audio files if they exist
+if [ -d "$AUDIO_DIR" ] && [ "$(ls -A "$AUDIO_DIR" 2>/dev/null)" ]; then
+  cp -r "$AUDIO_DIR" "$STAGING/audio"
+  log "Audio files copied ($(du -sh "$AUDIO_DIR" | cut -f1))"
+fi
+
+# Compress into dated archive
+ARCHIVE_NAME="nixonnote-${TIMESTAMP}.tar.gz"
+tar -czf "$BACKUP_ROOT/$ARCHIVE_NAME" -C "$STAGING" .
+ARCHIVE_SIZE=$(du -h "$BACKUP_ROOT/$ARCHIVE_NAME" | cut -f1)
+log "Archive created: $ARCHIVE_NAME ($ARCHIVE_SIZE)"
+
+# Tag monthly backups (1st of month) by creating a marker
+if [ "$DAY_OF_MONTH" = "01" ]; then
+  MONTHLY_NAME="nixonnote-monthly-${DATE}.tar.gz"
+  cp "$BACKUP_ROOT/$ARCHIVE_NAME" "$BACKUP_ROOT/$MONTHLY_NAME"
+  log "Monthly backup created: $MONTHLY_NAME"
+fi
+
+# Save hash for change detection
+echo "$CURRENT_HASH" > "$STATE_FILE"
+
+# Prune old daily backups (older than retention period)
+# Only prune non-monthly backups
+log "Pruning backups older than $RETENTION_DAYS days..."
+find "$BACKUP_ROOT" -name 'nixonnote-[0-9]*.tar.gz' -not -name 'nixonnote-monthly-*' -mtime +${RETENTION_DAYS} -delete -print | while read -r f; do
+  log "Pruned: $(basename "$f")"
+done
+
+log "Backup complete"

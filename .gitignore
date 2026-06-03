@@ -1,0 +1,63 @@
+# OS/Editor artifacts
+.DS_Store
+.pids/
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+*.sublime-*
+
+# Environment/secrets (never commit these)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts (add project-specific patterns below)
+dist/
+build/
+*.pyc
+__pycache__/
+node_modules/
+.venv/
+venv/
+
+# Beads internal directories (managed by beads, not git)
+.beads/backup/
+.beads/embeddeddolt/
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# Audio files (local recordings, not versioned)
+audio/
+audio_pending/
+
+# SQLite database files
+*.db
+*.db-wal
+*.db-shm
+
+# Apple Notes export directory (contains personal notes)
+apple-notes-export/
+
+# Added by cargo
+/target
+.envrc
+
+# Local private hold area for files intentionally not published
+.private/
+
+# Local agent/editor settings
+.claude/settings.json
+
+# Bun is the package manager for this repo
+web/package-lock.json

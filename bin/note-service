@@ -1,0 +1,20 @@
+#!/bin/bash
+# Wrapper script for launchd service.
+# Sources .envrc so secrets live in one place.
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+# Source environment (same file used by direnv in dev)
+if [ -f "$PROJECT_DIR/.envrc" ]; then
+  set -a
+  source "$PROJECT_DIR/.envrc"
+  set +a
+fi
+
+# In production mode, the Rust binary serves on NOTE_PORT directly
+export NOTE_PORT="${APP_PORT:-9999}"
+
+exec "$PROJECT_DIR/target/release/note"
