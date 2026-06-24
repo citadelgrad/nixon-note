@@ -1,6 +1,6 @@
 #!/bin/bash
 # Wrapper script for launchd service.
-# Sources .envrc so secrets live in one place.
+# Sources local environment settings when present.
 
 set -euo pipefail
 
@@ -10,6 +10,7 @@ cd "$PROJECT_DIR"
 # Source environment (same file used by direnv in dev)
 if [ -f "$PROJECT_DIR/.envrc" ]; then
   set -a
+  # shellcheck source=/dev/null
   source "$PROJECT_DIR/.envrc"
   set +a
 fi
