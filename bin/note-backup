@@ -1,7 +1,15 @@
 #!/bin/bash
-# NixonNote automated backup script
-# Backs up SQLite database + audio files to iCloud Drive
-# Designed for launchd (runs twice daily)
+# NixonNote automated backup script.
+# Backs up the SQLite database and audio files to a configurable directory.
+# Designed for launchd or another local scheduler.
+#
+# Configuration:
+#   NOTE_BACKUP_ROOT            Backup destination directory (default: ./backups)
+#   NOTE_DB                     SQLite database path (default: ./note.db)
+#   NOTE_AUDIO_DIR              Audio directory path (default: ./audio)
+#   NOTE_BACKUP_LOG             Log file path (default: ~/Library/Logs/nixonnote-backup.log)
+#   NOTE_BACKUP_STATE_FILE      Change-detection hash file (default: $NOTE_BACKUP_ROOT/.last-backup-hash)
+#   NOTE_BACKUP_RETENTION_DAYS  Daily backup retention (default: 90)
 #
 # Retention policy:
 #   - Daily backups: kept for 90 days
@@ -10,22 +18,30 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BACKUP_ROOT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/__Business__/--Data-Migration--/nixonnote"
-DB_PATH="$PROJECT_DIR/note.db"
-AUDIO_DIR="$PROJECT_DIR/audio"
-STATE_FILE="$BACKUP_ROOT/.last-backup-hash"
-LOG_FILE="$HOME/Library/Logs/note.backup.log"
+BACKUP_ROOT="${NOTE_BACKUP_ROOT:-$PROJECT_DIR/backups}"
+DB_PATH="${NOTE_DB:-$PROJECT_DIR/note.db}"
+AUDIO_DIR="${NOTE_AUDIO_DIR:-$PROJECT_DIR/audio}"
+STATE_FILE="${NOTE_BACKUP_STATE_FILE:-$BACKUP_ROOT/.last-backup-hash}"
+LOG_FILE="${NOTE_BACKUP_LOG:-$HOME/Library/Logs/nixonnote-backup.log}"
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 DAY_OF_MONTH=$(date +%d)
-RETENTION_DAYS=90
+RETENTION_DAYS="${NOTE_BACKUP_RETENTION_DAYS:-90}"
+
+case "$RETENTION_DAYS" in
+  ''|*[!0-9]*)
+    echo "NOTE_BACKUP_RETENTION_DAYS must be a positive integer" >&2
+    exit 1
+    ;;
+esac
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
 }
 
-# Ensure backup directory exists
+# Ensure backup and log directories exist
 mkdir -p "$BACKUP_ROOT"
+mkdir -p "$(dirname "$LOG_FILE")"
 
 # Check if database exists
 if [ ! -f "$DB_PATH" ]; then
@@ -79,7 +95,7 @@ echo "$CURRENT_HASH" > "$STATE_FILE"
 # Prune old daily backups (older than retention period)
 # Only prune non-monthly backups
 log "Pruning backups older than $RETENTION_DAYS days..."
-find "$BACKUP_ROOT" -name 'nixonnote-[0-9]*.tar.gz' -not -name 'nixonnote-monthly-*' -mtime +${RETENTION_DAYS} -delete -print | while read -r f; do
+find "$BACKUP_ROOT" -name 'nixonnote-[0-9]*.tar.gz' -not -name 'nixonnote-monthly-*' -mtime +"${RETENTION_DAYS}" -delete -print | while read -r f; do
   log "Pruned: $(basename "$f")"
 done
 
