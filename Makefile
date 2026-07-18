@@ -218,10 +218,20 @@ deploy: build ## Build and restart the production service
 .PHONY: status
 status: ## Show service status and health
 	@echo "=== Service ==="
-	@launchctl print gui/$$(id -u)/$(PLIST_NAME) 2>/dev/null | head -20 || echo "Service not loaded"
+	@launchctl print gui/$$(id -u)/$(PLIST_NAME) 2>/dev/null | \
+		awk 'BEGIN { skip = 0; depth = 0 } \
+			/^[[:space:]]*(inherited environment|environment) = \{/ { skip = 1; depth = 1; next } \
+			skip { depth += gsub(/\{/, "{"); depth -= gsub(/\}/, "}"); if (depth <= 0) skip = 0; next } \
+			{ print }' | head -16 || echo "Service not loaded"
 	@echo ""
 	@echo "=== Health ==="
-	@curl -sf http://localhost:$(APP_PORT)/api/status | python3 -m json.tool 2>/dev/null || echo "Not responding on port $(APP_PORT)"
+	@tmp=$$(mktemp); \
+	if curl -sf http://localhost:$(APP_PORT)/api/status > $$tmp; then \
+		python3 -c 'import json, pathlib, sys; data = json.loads(pathlib.Path(sys.argv[1]).read_text()); print("server: responding"); print("auth_enabled: {}".format(data.get("server", {}).get("auth_enabled", False))); print("services:"); [print("  {}: configured={} healthy={}".format(name, svc.get("configured", False), svc.get("healthy", False))) for name, svc in sorted(data.get("services", {}).items())]' $$tmp; \
+	else \
+		echo "Not responding on port $(APP_PORT)"; \
+	fi; \
+	rm -f $$tmp
 
 .PHONY: logs
 logs: ## Tail service logs
