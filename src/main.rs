@@ -13,6 +13,14 @@ fn db_path() -> String {
 // --- CLI mode ---
 
 fn run_cli(args: &[String]) -> Result<()> {
+    if args.first().map(|s| s.as_str()) == Some("--backfill-audio-titles") {
+        let path = db_path();
+        let conn = db::open_and_migrate(&path)?;
+        let updated = db::queries::backfill_audio_episode_titles(&conn)?;
+        println!("Backfilled {updated} audio episode title(s)");
+        return Ok(());
+    }
+
     let content = args.join(" ");
     if content.trim().is_empty() {
         bail!("Usage: note <your thought here>");
@@ -46,6 +54,10 @@ async fn run_server() -> Result<()> {
     // Run migrations on a direct connection first
     {
         let conn = db::open_and_migrate(&path)?;
+        let updated = db::queries::backfill_audio_episode_titles(&conn)?;
+        if updated > 0 {
+            tracing::info!(updated, "Backfilled audio episode titles");
+        }
         drop(conn);
     }
 

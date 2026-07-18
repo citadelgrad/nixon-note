@@ -147,7 +147,7 @@ impl ServerHandler for NoteMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_protocol_version(ProtocolVersion::V_2024_11_05)
-            .with_server_info(Implementation::new("nixonnote", "0.1.0"))
+            .with_server_info(Implementation::new("nixonnote", "0.1.1"))
             .with_instructions("Search and manage notes in your personal knowledge base")
     }
 }

@@ -148,8 +148,8 @@ pub async fn generate_audio(
     let title = body
         .title
         .as_deref()
-        .and_then(clean_title)
-        .unwrap_or_else(|| derive_episode_title(&body.episode_type, &notes));
+        .and_then(queries::clean_audio_episode_title)
+        .unwrap_or_else(|| queries::derive_audio_episode_title(&body.episode_type, &notes));
 
     // Fail fast: check that the selected TTS provider's API key is configured
     match tts_provider.as_str() {
@@ -500,88 +500,6 @@ fn format_duration(total_secs: u64) -> String {
     }
 }
 
-fn derive_episode_title(episode_type: &str, notes: &[queries::Note]) -> String {
-    match episode_type {
-        "digest" => {
-            let today = chrono_today();
-            format!("{today} Daily Digest")
-        }
-        "batch" => {
-            let first_title = notes
-                .first()
-                .and_then(note_title_or_content_title)
-                .unwrap_or_else(|| "Notes".to_string());
-            format!("{} + {} more", first_title, notes.len().saturating_sub(1))
-        }
-        _ => notes
-            .first()
-            .and_then(note_title_or_content_title)
-            .unwrap_or_else(|| "Untitled Note".to_string()),
-    }
-}
-
-fn note_title_or_content_title(note: &queries::Note) -> Option<String> {
-    note.title
-        .as_deref()
-        .and_then(clean_title)
-        .or_else(|| title_from_content(&note.content))
-}
-
-fn clean_title(title: &str) -> Option<String> {
-    let title = title.trim();
-    if title.is_empty() {
-        None
-    } else {
-        Some(title.to_string())
-    }
-}
-
-fn title_from_content(content: &str) -> Option<String> {
-    let line = content
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty() && *line != "[Voice memo - transcribing...]")?;
-
-    let line = line
-        .trim_start_matches('#')
-        .trim_start_matches(['-', '*', '•'])
-        .trim();
-
-    let sentence_end = line
-        .char_indices()
-        .find_map(|(idx, ch)| matches!(ch, '.' | '!' | '?').then_some(idx));
-    let candidate = match sentence_end {
-        Some(idx) => &line[..idx],
-        None => line,
-    }
-    .trim_matches([':', '-', '—', ' ']);
-
-    let title = truncate_title_words(candidate, 10);
-    clean_title(&title)
-}
-
-fn truncate_title_words(text: &str, max_words: usize) -> String {
-    text.split_whitespace()
-        .take(max_words)
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn chrono_today() -> String {
-    // Simple date formatting without chrono dependency
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let days = now / 86400;
-    // Approximate — good enough for display titles
-    let year = 1970 + days / 365;
-    let remaining_days = days % 365;
-    let month = remaining_days / 30 + 1;
-    let day = remaining_days % 30 + 1;
-    format!("{year}-{month:02}-{day:02}")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,7 +523,10 @@ mod tests {
     fn derive_episode_title_prefers_existing_note_title() {
         let notes = vec![note(Some("Existing AI Title"), "Raw note content")];
 
-        assert_eq!(derive_episode_title("single", &notes), "Existing AI Title");
+        assert_eq!(
+            queries::derive_audio_episode_title("single", &notes),
+            "Existing AI Title"
+        );
     }
 
     #[test]
@@ -616,7 +537,7 @@ mod tests {
         )];
 
         assert_eq!(
-            derive_episode_title("single", &notes),
+            queries::derive_audio_episode_title("single", &notes),
             "Quarterly EBITDA update: margin expansion and cash flow notes"
         );
     }
@@ -629,7 +550,7 @@ mod tests {
         )];
 
         assert_eq!(
-            derive_episode_title("single", &notes),
+            queries::derive_audio_episode_title("single", &notes),
             "Product launch checklist"
         );
     }
@@ -642,16 +563,16 @@ mod tests {
         ];
 
         assert_eq!(
-            derive_episode_title("batch", &notes),
+            queries::derive_audio_episode_title("batch", &notes),
             "First useful note + 1 more"
         );
     }
 
     #[test]
     fn clean_title_rejects_blank_request_titles() {
-        assert_eq!(clean_title("  \t  "), None);
+        assert_eq!(queries::clean_audio_episode_title("  \t  "), None);
         assert_eq!(
-            clean_title("  Custom Episode  "),
+            queries::clean_audio_episode_title("  Custom Episode  "),
             Some("Custom Episode".to_string())
         );
     }

@@ -110,7 +110,13 @@ pub fn get_notes_by_ids(conn: &Connection, ids: &[i64]) -> Result<Vec<Note>> {
     let params: Vec<&dyn rusqlite::ToSql> =
         ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
     let notes = stmt.query_map(&params[..], row_to_note)?;
-    notes.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    let mut notes = notes.collect::<Result<Vec<_>, _>>()?;
+    notes.sort_by_key(|note| {
+        ids.iter()
+            .position(|id| *id == note.id)
+            .unwrap_or(usize::MAX)
+    });
+    Ok(notes)
 }
 
 pub fn list_notes(conn: &Connection, limit: i64, offset: i64) -> Result<Vec<Note>> {
@@ -524,6 +530,126 @@ pub fn create_audio_episode(
     Ok(episode_id)
 }
 
+pub fn backfill_audio_episode_titles(conn: &Connection) -> Result<usize> {
+    let mut stmt = conn.prepare(
+        "SELECT id, episode_type
+         FROM audio_episodes
+         WHERE TRIM(title) = '' OR title = 'Untitled Note'
+         ORDER BY id ASC",
+    )?;
+    let episodes = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    let mut updated = 0;
+    for (episode_id, episode_type) in episodes {
+        let note_ids = get_episode_note_ids(conn, episode_id)?;
+        let notes = get_notes_by_ids(conn, &note_ids)?;
+        let title = derive_audio_episode_title(&episode_type, &notes);
+        if title != "Untitled Note" {
+            conn.execute(
+                "UPDATE audio_episodes SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+                params![title, episode_id],
+            )?;
+            updated += 1;
+        }
+    }
+
+    Ok(updated)
+}
+
+pub fn derive_audio_episode_title(episode_type: &str, notes: &[Note]) -> String {
+    match episode_type {
+        "digest" => {
+            let today = display_today();
+            format!("{today} Daily Digest")
+        }
+        "batch" => {
+            let first_title = notes
+                .first()
+                .and_then(note_title_or_content_title)
+                .unwrap_or_else(|| "Notes".to_string());
+            format!("{} + {} more", first_title, notes.len().saturating_sub(1))
+        }
+        _ => notes
+            .first()
+            .and_then(note_title_or_content_title)
+            .unwrap_or_else(|| "Untitled Note".to_string()),
+    }
+}
+
+pub fn clean_audio_episode_title(title: &str) -> Option<String> {
+    let title = title.trim();
+    if title.is_empty() {
+        None
+    } else {
+        Some(title.to_string())
+    }
+}
+
+fn note_title_or_content_title(note: &Note) -> Option<String> {
+    note.title
+        .as_deref()
+        .and_then(clean_audio_episode_title)
+        .or_else(|| title_from_content(&note.content))
+}
+
+fn title_from_content(content: &str) -> Option<String> {
+    let line = content
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && *line != "[Voice memo - transcribing...]")?;
+
+    let line = line
+        .trim_start_matches('#')
+        .trim_start_matches(['-', '*', '•'])
+        .trim();
+
+    let sentence_end = line
+        .char_indices()
+        .find_map(|(idx, ch)| matches!(ch, '.' | '!' | '?').then_some(idx));
+    let candidate = match sentence_end {
+        Some(idx) => &line[..idx],
+        None => line,
+    }
+    .trim_matches([':', '-', '—', ' ']);
+
+    let title = truncate_title_words(candidate, 10);
+    clean_audio_episode_title(&title)
+}
+
+fn truncate_title_words(text: &str, max_words: usize) -> String {
+    text.split_whitespace()
+        .take(max_words)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn display_today() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let days = now / 86400;
+    let year = 1970 + days / 365;
+    let remaining_days = days % 365;
+    let month = remaining_days / 30 + 1;
+    let day = remaining_days % 30 + 1;
+    format!("{year}-{month:02}-{day:02}")
+}
+
+fn get_episode_note_ids(conn: &Connection, episode_id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(
+        "SELECT note_id FROM audio_episode_notes WHERE episode_id = ?1 ORDER BY position ASC",
+    )?;
+    let note_ids = stmt.query_map(params![episode_id], |row| row.get(0))?;
+    note_ids
+        .collect::<std::result::Result<Vec<i64>, _>>()
+        .map_err(Into::into)
+}
+
 pub fn get_audio_episode(conn: &Connection, id: i64) -> Result<AudioEpisode> {
     let mut episode = conn
         .query_row(
@@ -536,12 +662,7 @@ pub fn get_audio_episode(conn: &Connection, id: i64) -> Result<AudioEpisode> {
         .context("Audio episode not found")?;
 
     // Populate note_ids
-    let mut stmt = conn.prepare(
-        "SELECT note_id FROM audio_episode_notes WHERE episode_id = ?1 ORDER BY position",
-    )?;
-    episode.note_ids = stmt
-        .query_map(params![id], |row| row.get(0))?
-        .collect::<std::result::Result<Vec<i64>, _>>()?;
+    episode.note_ids = get_episode_note_ids(conn, id)?;
 
     Ok(episode)
 }
@@ -1003,6 +1124,101 @@ mod tests {
         assert_eq!(found.unwrap().id, id);
         let missing = find_note_by_source_url(&conn, "https://nope.com").unwrap();
         assert!(missing.is_none());
+    }
+
+    #[test]
+    fn get_notes_by_ids_preserves_requested_order() {
+        let conn = setup();
+        let first = insert_note(&conn, "first requested", "text", "cli", None).unwrap();
+        let second = insert_note(&conn, "second requested", "text", "cli", None).unwrap();
+
+        let notes = get_notes_by_ids(&conn, &[first, second]).unwrap();
+
+        assert_eq!(
+            notes.iter().map(|note| note.id).collect::<Vec<_>>(),
+            vec![first, second]
+        );
+    }
+
+    #[test]
+    fn backfill_audio_episode_titles_uses_note_title() {
+        let conn = setup();
+        let note_id = insert_note(&conn, "raw body", "text", "cli", None).unwrap();
+        conn.execute(
+            "UPDATE notes SET title = 'Backfilled Note Title' WHERE id = ?1",
+            params![note_id],
+        )
+        .unwrap();
+        let episode_id = create_audio_episode(
+            &conn,
+            "Untitled Note",
+            "single",
+            "full",
+            "elevenlabs",
+            "voice",
+            &[note_id],
+        )
+        .unwrap();
+
+        assert_eq!(backfill_audio_episode_titles(&conn).unwrap(), 1);
+
+        assert_eq!(
+            get_audio_episode(&conn, episode_id).unwrap().title,
+            "Backfilled Note Title"
+        );
+    }
+
+    #[test]
+    fn backfill_audio_episode_titles_uses_content_fallback() {
+        let conn = setup();
+        let note_id = insert_note(
+            &conn,
+            "# ElevenLabs rollout notes\nThis body should not become the title.",
+            "text",
+            "cli",
+            None,
+        )
+        .unwrap();
+        let episode_id = create_audio_episode(
+            &conn,
+            "Untitled Note",
+            "single",
+            "full",
+            "elevenlabs",
+            "voice",
+            &[note_id],
+        )
+        .unwrap();
+
+        assert_eq!(backfill_audio_episode_titles(&conn).unwrap(), 1);
+
+        assert_eq!(
+            get_audio_episode(&conn, episode_id).unwrap().title,
+            "ElevenLabs rollout notes"
+        );
+    }
+
+    #[test]
+    fn backfill_audio_episode_titles_preserves_custom_titles() {
+        let conn = setup();
+        let note_id = insert_note(&conn, "new body", "text", "cli", None).unwrap();
+        let episode_id = create_audio_episode(
+            &conn,
+            "Already Good",
+            "single",
+            "full",
+            "elevenlabs",
+            "voice",
+            &[note_id],
+        )
+        .unwrap();
+
+        assert_eq!(backfill_audio_episode_titles(&conn).unwrap(), 0);
+
+        assert_eq!(
+            get_audio_episode(&conn, episode_id).unwrap().title,
+            "Already Good"
+        );
     }
 
     #[test]
