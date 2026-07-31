@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Publish a built NixonNote release and restart its Homebrew service.
+
+set -euo pipefail
+
+PROJECT_DIR="${NIXONNOTE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+ENV_FILE="${NIXONNOTE_ENV_FILE:-$HOME/.config/nixonnote/env}"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  set +a
+fi
+
+APP_SUPPORT_DIR="${NIXONNOTE_APP_SUPPORT_DIR:-$HOME/Library/Application Support/NixonNote}"
+RUNTIME_DIR="${NIXONNOTE_RUNTIME_DIR:-$APP_SUPPORT_DIR/runtime}"
+RELEASES_DIR="$RUNTIME_DIR/releases"
+CURRENT_LINK="$RUNTIME_DIR/current"
+SERVICE_NAME="${NIXONNOTE_BREW_SERVICE:-nixonnote}"
+APP_PORT="${APP_PORT:-9999}"
+HEALTH_URL="http://127.0.0.1:$APP_PORT/api/status"
+ROOT_URL="http://127.0.0.1:$APP_PORT/"
+
+BINARY_SRC="$PROJECT_DIR/target/release/note"
+WEB_SRC="$PROJECT_DIR/web/dist"
+
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+[ -x "$BINARY_SRC" ] || fail "missing release binary: $BINARY_SRC (run make build)"
+[ -f "$WEB_SRC/index.html" ] || fail "missing frontend build: $WEB_SRC/index.html (run make build)"
+command -v brew >/dev/null 2>&1 || fail "Homebrew is required to manage the NixonNote service"
+brew services info "$SERVICE_NAME" >/dev/null 2>&1 || fail "Homebrew service '$SERVICE_NAME' is not installed"
+
+mkdir -p "$RELEASES_DIR"
+release_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+release_dir="$RELEASES_DIR/$release_id"
+next_link="$RUNTIME_DIR/.current-$release_id"
+previous_target=""
+
+cleanup() {
+  rm -f "$next_link"
+}
+trap cleanup EXIT
+
+mkdir -p "$release_dir/web"
+install -m 0755 "$BINARY_SRC" "$release_dir/note"
+cp -R "$WEB_SRC/." "$release_dir/web/"
+
+if [ -L "$CURRENT_LINK" ]; then
+  previous_target="$(readlink "$CURRENT_LINK")"
+fi
+
+ln -s "$release_dir" "$next_link"
+mv -fh "$next_link" "$CURRENT_LINK"
+
+if brew services restart "$SERVICE_NAME" >/dev/null; then
+  healthy=false
+  for _ in $(seq 1 30); do
+    if curl --max-time 2 -fsS "$ROOT_URL" >/dev/null \
+      && curl --max-time 2 -fsS "$HEALTH_URL" >/dev/null; then
+      healthy=true
+      break
+    fi
+    sleep 1
+  done
+
+  if [ "$healthy" = true ]; then
+    printf 'Deployed NixonNote release %s\n' "$release_id"
+    printf 'Runtime: %s\n' "$release_dir"
+    printf 'App: %s\n' "$ROOT_URL"
+    exit 0
+  fi
+fi
+
+printf 'Deployment health check failed; restoring previous runtime.\n' >&2
+if [ -n "$previous_target" ]; then
+  ln -s "$previous_target" "$next_link"
+  mv -fh "$next_link" "$CURRENT_LINK"
+  brew services restart "$SERVICE_NAME" >/dev/null || true
+else
+  rm -f "$CURRENT_LINK"
+  brew services stop "$SERVICE_NAME" >/dev/null || true
+fi
+exit 1

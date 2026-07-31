@@ -228,7 +228,7 @@ async fn transcribe_with_whisper(
     let tmp_path = tmp_wav_path;
 
     // Get model storage directory from env or use default
-    // WHISPER_MODEL_DIR can be set in com.scott.note.plist
+    // WHISPER_MODEL_DIR can be set in ~/.config/nixonnote/env
     let model_dir = std::env::var("WHISPER_MODEL_DIR").unwrap_or_else(|_| {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         format!("{}/.cache/whisper", home)

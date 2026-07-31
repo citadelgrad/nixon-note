@@ -1,21 +1,34 @@
 #!/bin/bash
-# Wrapper script for launchd service.
-# Sources local environment settings when present.
+# Homebrew service entrypoint. Runtime artifacts live outside the checkout so
+# cargo clean and frontend rebuilds cannot remove files used by the service.
 
 set -euo pipefail
 
-PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$PROJECT_DIR"
+APP_SUPPORT_DIR="${NIXONNOTE_APP_SUPPORT_DIR:-$HOME/Library/Application Support/NixonNote}"
+RUNTIME_DIR="${NIXONNOTE_RUNTIME_DIR:-$APP_SUPPORT_DIR/runtime}"
+CURRENT_DIR="$RUNTIME_DIR/current"
+ENV_FILE="${NIXONNOTE_ENV_FILE:-$HOME/.config/nixonnote/env}"
 
-# Source environment (same file used by direnv in dev)
-if [ -f "$PROJECT_DIR/.envrc" ]; then
+if [ -f "$ENV_FILE" ]; then
   set -a
   # shellcheck source=/dev/null
-  source "$PROJECT_DIR/.envrc"
+  source "$ENV_FILE"
   set +a
 fi
 
-# In production mode, the Rust binary serves on NOTE_PORT directly
-export NOTE_PORT="${APP_PORT:-9999}"
+[ -x "$CURRENT_DIR/note" ] || {
+  echo "NixonNote runtime is missing. Run 'make deploy' from the project checkout." >&2
+  exit 1
+}
+[ -f "$CURRENT_DIR/web/index.html" ] || {
+  echo "NixonNote web runtime is missing. Run 'make deploy' from the project checkout." >&2
+  exit 1
+}
 
-exec "$PROJECT_DIR/target/release/note"
+mkdir -p "$APP_SUPPORT_DIR/data"
+export NOTE_PORT="${APP_PORT:-9999}"
+export NOTE_DB="${NOTE_DB:-$APP_SUPPORT_DIR/data/note.db}"
+export NOTE_WEB_DIR="$CURRENT_DIR/web"
+
+cd "$CURRENT_DIR"
+exec "$CURRENT_DIR/note"

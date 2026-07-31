@@ -121,7 +121,7 @@ async fn create_gemini_stream(
     previous_interaction_id: Option<String>,
 ) -> Result<impl Stream<Item = Result<Event, Infallible>>, AppError> {
     let api_key = std::env::var("GEMINI_API_KEY")
-        .map_err(|_| AppError::Internal(anyhow::anyhow!("GEMINI_API_KEY environment variable is not set. Please configure the API key in your LaunchAgent plist.")))?;
+        .map_err(|_| AppError::Internal(anyhow::anyhow!("GEMINI_API_KEY environment variable is not set. Configure it in ~/.config/nixonnote/env and restart the service.")))?;
 
     let request = GeminiInteractionRequest {
         model: "gemini-3-flash-preview".to_string(),

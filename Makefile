@@ -11,10 +11,10 @@ APP_PORT     ?= 9999
 API_PORT     ?= 8999
 DB_PATH      := note.db
 WEB_DIR      := web
-PLIST_NAME   := com.scott.note
-PLIST_SRC    := $(PLIST_NAME).plist
-PLIST_DEST   := $(HOME)/Library/LaunchAgents/$(PLIST_SRC)
 LOG_DIR      := $(HOME)/Library/Logs
+BREW_SERVICE := nixonnote
+BREW_PREFIX  := $(shell brew --prefix 2>/dev/null)
+BREW_LOG_DIR := $(BREW_PREFIX)/var/log
 
 # Load .env if present (Make-native VAR=value format)
 -include .env
@@ -132,7 +132,7 @@ build-web: _ensure-web-deps ## Build frontend for production
 # ── Testing ──────────────────────────────────────────────────
 
 .PHONY: test
-test: test-api test-web ## Run all tests
+test: test-api test-web test-service ## Run all tests
 
 .PHONY: test-api
 test-api: ## Run backend tests
@@ -149,6 +149,10 @@ test-web-watch: _ensure-web-deps ## Run frontend tests in watch mode
 .PHONY: test-web-ui
 test-web-ui: _ensure-web-deps ## Run frontend tests with browser UI
 	cd $(WEB_DIR) && bun run test:ui
+
+.PHONY: test-service
+test-service: ## Test immutable service deployment and rollback
+	@./tests/service-deploy.sh
 
 # ── Code Quality ─────────────────────────────────────────────
 
@@ -177,65 +181,52 @@ fmt: ## Format all code
 	cargo fmt
 	cd $(WEB_DIR) && npx prettier --write 'src/**/*.{ts,tsx,css}'
 
-# ── Service (macOS LaunchAgent) ──────────────────────────────
-# Config lives in .envrc (secrets) + com.scott.note.plist (launchd).
-# bin/note-service wrapper sources .envrc before launching the binary.
+# ── Service (Homebrew on macOS) ──────────────────────────────
+# `make deploy` publishes immutable runtime artifacts outside target/ and
+# restarts the sole production service. Config lives in ~/.config/nixonnote/env.
 
 .PHONY: install
-install: build ## Build and install as macOS service
-	@mkdir -p "$(HOME)/Library/LaunchAgents"
-	@cp "$(PLIST_SRC)" "$(PLIST_DEST)"
-	@launchctl bootout gui/$$(id -u) "$(PLIST_DEST)" 2>/dev/null || true
-	@launchctl bootstrap gui/$$(id -u) "$(PLIST_DEST)"
-	@echo "Service installed. Access at http://localhost:$(APP_PORT)"
+install: deploy ## Build, publish, and start the Homebrew service
 
 .PHONY: uninstall
-uninstall: ## Stop and remove macOS service
-	@launchctl bootout gui/$$(id -u) "$(PLIST_DEST)" 2>/dev/null || true
-	@rm -f "$(PLIST_DEST)"
-	@echo "Service uninstalled."
+uninstall: ## Stop the Homebrew service (does not uninstall the formula or data)
+	@brew services stop $(BREW_SERVICE)
 
 .PHONY: start
 start: ## Start the service
-	@launchctl kickstart gui/$$(id -u)/$(PLIST_NAME)
+	@brew services start $(BREW_SERVICE)
 
 .PHONY: stop
 stop: ## Stop the service
-	@launchctl kill SIGTERM gui/$$(id -u)/$(PLIST_NAME)
+	@brew services stop $(BREW_SERVICE)
 
 .PHONY: restart
 restart: ## Restart the service
-	@launchctl kickstart -k gui/$$(id -u)/$(PLIST_NAME)
-	@echo "Service restarted."
+	@brew services restart $(BREW_SERVICE)
 
 .PHONY: deploy
-deploy: build ## Build and restart the production service
-	@cp "$(PLIST_SRC)" "$(PLIST_DEST)"
-	@launchctl bootout gui/$$(id -u) "$(PLIST_DEST)" 2>/dev/null || true
-	@launchctl bootstrap gui/$$(id -u) "$(PLIST_DEST)"
-	@echo "Deployed and restarted."
+deploy: build ## Build, atomically publish, restart, and health-check production
+	@./bin/deploy-service
 
 .PHONY: status
 status: ## Show service status and health
 	@echo "=== Service ==="
-	@launchctl print gui/$$(id -u)/$(PLIST_NAME) 2>/dev/null | \
-		awk 'BEGIN { skip = 0; depth = 0 } \
-			/^[[:space:]]*(inherited environment|environment) = \{/ { skip = 1; depth = 1; next } \
-			skip { depth += gsub(/\{/, "{"); depth -= gsub(/\}/, "}"); if (depth <= 0) skip = 0; next } \
-			{ print }' | head -16 || echo "Service not loaded"
+	@brew services info $(BREW_SERVICE) 2>/dev/null || echo "Service not installed"
 	@echo ""
 	@echo "=== Health ==="
-	@tmp=$$(mktemp); \
-	if curl -sf http://localhost:$(APP_PORT)/api/status > $$tmp; then \
+	@tmp=$$(mktemp); env_file="$(HOME)/.config/nixonnote/env"; \
+	if [ -f "$$env_file" ]; then set -a; . "$$env_file"; set +a; fi; \
+	port=$${APP_PORT:-9999}; \
+	if curl -sf "http://localhost:$$port/api/status" > $$tmp; then \
 		python3 -c 'import json, pathlib, sys; data = json.loads(pathlib.Path(sys.argv[1]).read_text()); print("server: responding"); print("auth_enabled: {}".format(data.get("server", {}).get("auth_enabled", False))); print("services:"); [print("  {}: configured={} healthy={}".format(name, svc.get("configured", False), svc.get("healthy", False))) for name, svc in sorted(data.get("services", {}).items())]' $$tmp; \
 	else \
-		echo "Not responding on port $(APP_PORT)"; \
+		echo "Not responding on port $$port"; \
 	fi; \
 	rm -f $$tmp
 
 .PHONY: logs
 logs: ## Tail service logs
-	@tail -f "$(LOG_DIR)/note.stdout.log" "$(LOG_DIR)/note.stderr.log"
+	@tail -f "$(BREW_LOG_DIR)/nixonnote.stdout.log" "$(BREW_LOG_DIR)/nixonnote.stderr.log"
 
 # ── Database ─────────────────────────────────────────────────
 
@@ -305,6 +296,7 @@ setup: ## First-time setup: install deps, create .env
 clean: ## Remove build artifacts
 	cargo clean
 	rm -rf $(WEB_DIR)/dist $(WEB_DIR)/node_modules/.vite
+	@echo "Deployed runtime preserved under ~/Library/Application Support/NixonNote/runtime"
 
 .PHONY: nuke
 nuke: clean ## Remove everything (build artifacts + node_modules)
@@ -369,7 +361,7 @@ help: ## Show this help
 	@printf '  \033[36mmake dev-status\033[0m   Check dev health\n'
 	@printf '\n'
 	@printf '\033[1mProd workflow:\033[0m\n'
-	@printf '  \033[36mmake deploy\033[0m       Build + restart launchd service\n'
+	@printf '  \033[36mmake deploy\033[0m       Build + publish + verify Homebrew service\n'
 	@printf '  \033[36mmake status\033[0m       Check prod service health\n'
 	@printf '  \033[36mmake logs\033[0m         Tail prod logs\n'
 	@echo ""

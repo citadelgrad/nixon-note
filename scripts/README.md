@@ -97,7 +97,7 @@ my-notes/
 
 **Error: "401 Unauthorized"**
 - Set NOTE_TOKEN if authentication is enabled
-- Check your token in `com.scott.note.plist`
+- Check your token in `~/.config/nixonnote/env`
 
 **HTML tags in imported notes**
 - The import script automatically strips HTML

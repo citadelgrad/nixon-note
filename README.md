@@ -14,7 +14,7 @@ It is meant to run locally on your own machine or private network. Do not host i
 - **AI auto-organization** - Claude API tags and summarizes automatically
 - **Powerful search** - Full-text search (FTS5) + vector similarity (sqlite-vec)
 - **Local-first** - SQLite database, runs entirely on your machine
-- **Voice transcription** - Local Whisper via `simple_transcribe_rs` for speech-to-text
+- **Voice transcription** - Osaurus (Whisper) for local speech-to-text
 - **Background processing** - Async embedding generation and auto-organization
 
 ## Setup
@@ -31,42 +31,51 @@ Configure these for enhanced features:
 
 1. **Claude API** (auto-tagging and summarization)
    - Get your key at [console.anthropic.com](https://console.anthropic.com/)
-   - Add to `com.scott.note.plist`: `<key>ANTHROPIC_API_KEY</key><string>your-anthropic-key</string>`
+   - Add `ANTHROPIC_API_KEY=...` to `~/.config/nixonnote/env`
 
 2. **Gemini API** (conversational chat)
    - Get your key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-   - Add to `com.scott.note.plist`: `<key>GEMINI_API_KEY</key><string>your-gemini-key</string>`
+   - Add `GEMINI_API_KEY=...` to `~/.config/nixonnote/env`
 
 3. **Ollama** (local embeddings for vector search)
    - Install: [ollama.ai](https://ollama.ai/)
    - Pull model: `ollama pull nomic-embed-text`
    - Will auto-connect to `http://localhost:11434`
 
-Embeddings and transcription are local by design. Cloud APIs are optional and only used for higher-level language features such as auto-organization, chat, and TTS.
+All AI features are optional and the app will function without them.
 
 ## Quick Start
 
-### 1. Build
+### 1. Install the Homebrew service
 
 ```bash
-cargo build --release
+brew install <your-tap>/nixonnote
 ```
 
-### 2. Install as Service (Recommended)
+### 2. Configure
 
-Run as a macOS service that starts automatically and restarts on crashes:
+Put production environment variables in `~/.config/nixonnote/env`. This local
+file is used instead of reading `.envrc` from the checkout, which avoids macOS
+LaunchAgent restrictions on external volumes.
+
+### 3. Build and deploy
 
 ```bash
-./service.sh install
+make deploy
 ```
 
-The service will:
+Deployment builds the backend and frontend, publishes both under
+`~/Library/Application Support/NixonNote/runtime`, restarts Homebrew, and
+checks the web app and API. The published runtime is independent of `target/`
+and `web/dist`, so `make clean` cannot break the running service.
+
+The Homebrew service will:
 - Start automatically on login
 - Restart automatically if it crashes
 - Listen on port 9999
-- Log to `~/Library/Logs/note.*.log`
+- Log under `$(brew --prefix)/var/log/nixonnote.*.log`
 
-### 3. Verify
+### 4. Verify
 
 ```bash
 # Check status
@@ -79,7 +88,7 @@ The service will:
 ./service.sh logs -f
 ```
 
-### 4. Access
+### 5. Access
 
 - **Web UI**: http://localhost:9999
 - **CLI**: `./target/release/note "your thought here"`
@@ -94,20 +103,16 @@ The service will:
 ./service.sh status       # Show status and recent logs
 ./service.sh logs         # Show full logs
 ./service.sh logs -f      # Follow logs (live)
-./service.sh reload       # Reload config after editing plist
+./service.sh reload       # Restart after editing ~/.config/nixonnote/env
 ./service.sh test         # Test if service is responding
-./service.sh uninstall    # Remove the service completely
+./service.sh uninstall    # Stop the Homebrew service; preserve runtime and data
 ```
 
-### Homebrew Service (Alternative)
+### Homebrew Service
 
-You can also run NixonNote as a Homebrew-managed service if you package it with a local or published tap. This starts automatically on login and is managed with `brew services`.
-
-**Install:**
-
-```bash
-brew install <your-tap>/nixonnote
-```
+Homebrew is the sole production service manager. The old standalone
+`com.nixonnote.app`/`com.scott.note` LaunchAgent path has been retired because
+running both service managers can create a port conflict.
 
 **Manage:**
 
@@ -118,7 +123,7 @@ brew services restart nixonnote   # Restart after rebuilding
 brew services list | grep nixonnote  # Check status
 ```
 
-**Logs:** `/opt/homebrew/var/log/nixonnote.stdout.log` and `.stderr.log`
+**Logs:** `$(brew --prefix)/var/log/nixonnote.stdout.log` and `.stderr.log`
 
 **Environment:** The brew service sources env vars from `~/.config/nixonnote/env` (not `.envrc` directly, due to macOS TCC restrictions on external volumes). After changing `.envrc`, sync it:
 
@@ -127,26 +132,29 @@ cp .envrc ~/.config/nixonnote/env
 brew services restart nixonnote
 ```
 
-**Dev workflow:** The brew service runs your local release binary, so changes take effect after a rebuild:
+**Deployment workflow:**
 
 ```bash
-cargo build --release
-brew services restart nixonnote
+make deploy
 ```
+
+Each deployment creates an immutable release and atomically updates the
+`runtime/current` symlink. If either the web root or `/api/status` fails after
+restart, deployment restores the previous runtime and restarts the service.
 
 ## Configuration
 
 ### Environment Variables
 
-Edit your LaunchAgent plist or environment file to configure:
+Edit `~/.config/nixonnote/env` to configure production:
 
 #### Core Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NOTE_PORT` | `9999` | Port to listen on |
-| `NOTE_DB` | `./note.db` | SQLite database path |
-| `NOTE_WEB_DIR` | `./web/dist` | Frontend static files directory |
+| `APP_PORT` | `9999` | Production port; exported to the app as `NOTE_PORT` |
+| `NOTE_DB` | `~/Library/Application Support/NixonNote/data/note.db` | SQLite database path |
+| `NOTE_WEB_DIR` | deployed runtime web directory | Set by the service wrapper |
 | `NOTE_TOKEN` | (unset) | Bearer token for API auth. Required before exposing beyond localhost. |
 | `RUST_LOG` | `note=info` | Log level |
 
@@ -156,39 +164,27 @@ Edit your LaunchAgent plist or environment file to configure:
 |----------|-------------|------------|
 | `ANTHROPIC_API_KEY` | Claude API for auto-tagging and summarization | [Get key at console.anthropic.com](https://console.anthropic.com/) |
 | `GEMINI_API_KEY` | Gemini API for conversational chat | [Get key at aistudio.google.com](https://aistudio.google.com/apikey) |
-| `OLLAMA_URL` | Ollama endpoint for local embeddings | Default: `http://localhost:11434`. Uses `nomic-embed-text`; keep the same model for all indexed notes unless you re-embed everything. |
+| `OLLAMA_URL` | Ollama endpoint for local embeddings | Default: `http://localhost:11434`. [Install Ollama](https://ollama.ai/), then run `ollama pull nomic-embed-text` |
 
 **Note**: All AI features are optional and will gracefully degrade if not configured. The app will still function for basic note capture and search.
 
-After editing service configuration, reload:
+After editing service configuration, restart:
 
 ```bash
-./service.sh reload
+make restart
 ```
 
 ### Authentication
 
-To enable authentication, set `NOTE_TOKEN` in your environment or LaunchAgent config:
+To enable authentication, set `NOTE_TOKEN` in `~/.config/nixonnote/env`:
 
-```xml
-<key>NOTE_TOKEN</key>
-<string>your-secret-token-here</string>
+```bash
+NOTE_TOKEN=your-secret-token-here
 ```
 
 All API requests will then require an `Authorization` header with your bearer token.
 
 Do not expose NixonNote to the public internet without `NOTE_TOKEN` and a trusted network boundary such as Tailscale or a reverse proxy with authentication. The only unauthenticated API endpoint is `/api/status`.
-
-## Local AI decisions
-
-NixonNote intentionally keeps the two high-volume, privacy-sensitive AI paths local:
-
-- **Embeddings run locally through Ollama** using `nomic-embed-text`. Notes and search queries are embedded on your machine, then stored/searched in sqlite-vec. This keeps routine indexing cheap, avoids sending every note to an embedding API, and preserves one consistent 768-dimensional vector space. If you change embedding models, re-embed all notes; mixing models makes vector search garbage.
-- **Voice transcription runs locally through Whisper** using `simple_transcribe_rs`. Browser recordings are converted with ffmpeg and transcribed on-device. Whisper models download into `WHISPER_MODEL_DIR` on first use, with `WHISPER_MODEL_SIZE=medium` by default. This avoids uploading raw voice memos to a third-party transcription service.
-- **Cloud LLMs are used only where they add higher-level reasoning or generation.** Claude handles auto-tagging/summarization, Gemini handles chat, and OpenAI/Gemini/ElevenLabs can be used for TTS. Those are optional and degrade gracefully when keys are missing.
-
-The guiding tradeoff is simple: local for personal data plumbing and repeated background work; cloud only for optional synthesis/generation features where local models were not the goal of this personal build.
-
 
 ## Development
 
@@ -386,7 +382,7 @@ curl -X POST http://localhost:9999/api/notes/batch \
 | Async pool | deadpool-sqlite | Bridge between sync rusqlite and async Axum |
 | Migrations | rusqlite_migration | Lightweight, uses `user_version` pragma |
 | Local embeddings | Ollama (nomic-embed-text) | 768-dim embeddings, runs on Apple Silicon |
-| Local transcription | `simple_transcribe_rs` + Whisper | On-device transcription; ffmpeg converts browser audio to 16 kHz mono WAV first |
+| Local transcription | Osaurus (Whisper) | Apple Silicon optimized, OpenAI-compatible API |
 | Auto-org LLM | Claude API (Sonnet) | Structured output via `tool_use` |
 | Frontend | React + Vite + Tailwind | Minimal stack, fast HMR |
 
@@ -436,7 +432,7 @@ User Question
 When a note is created, a background job:
 1. Combines the note's title, content, and AI-generated summary
 2. Truncates to 8,000 characters (model's context limit)
-3. Sends to Ollama's `/api/embed` endpoint (`OLLAMA_URL`, default `http://localhost:11434`)
+3. Sends to Ollama's `/api/embed` endpoint
 4. Stores the resulting 768-dim float vector in the `note_embeddings` table via sqlite-vec
 
 ### Search Flow
@@ -461,8 +457,8 @@ Litestream is configured for continuous SQLite replication to S3. See `litestrea
 ## Logs
 
 Logs are written to:
-- `~/Library/Logs/note.stdout.log` - Application output
-- `~/Library/Logs/note.stderr.log` - Errors and warnings
+- `$(brew --prefix)/var/log/nixonnote.stdout.log` - Application output
+- `$(brew --prefix)/var/log/nixonnote.stderr.log` - Errors and warnings
 
 ```bash
 # View logs
@@ -472,7 +468,7 @@ Logs are written to:
 ./service.sh logs -f
 
 # Or use tail directly
-tail -f ~/Library/Logs/note.*.log
+tail -f "$(brew --prefix)/var/log/nixonnote."*.log
 ```
 
 ## Troubleshooting
@@ -485,7 +481,8 @@ tail -f ~/Library/Logs/note.*.log
 
 # Common issues:
 # - Port already in use: lsof -i :9999
-# - Binary not built: cargo build --release
+# - Runtime missing: make deploy
+# - Formula missing: brew install <your-tap>/nixonnote
 ```
 
 ### Port already in use
@@ -509,12 +506,12 @@ SQLite uses WAL mode with `busy_timeout = 5000ms`. If you see "database is locke
 ### AI Features Not Working
 
 **Chat shows "GEMINI_API_KEY not set" error**:
-1. Add your Gemini API key to `com.scott.note.plist`
-2. Reload: `./service.sh reload`
+1. Add your Gemini API key to `~/.config/nixonnote/env`
+2. Restart: `make restart`
 3. Get a key at: https://aistudio.google.com/apikey
 
 **Notes not being auto-tagged**:
-1. Check if `ANTHROPIC_API_KEY` is set in `com.scott.note.plist`
+1. Check if `ANTHROPIC_API_KEY` is set in `~/.config/nixonnote/env`
 2. Check logs for errors: `./service.sh logs | grep -i anthropic`
 3. Get a key at: https://console.anthropic.com/
 
@@ -527,7 +524,8 @@ SQLite uses WAL mode with `busy_timeout = 5000ms`. If you see "database is locke
 ## Documentation
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide
-- [SECURITY.md](SECURITY.md) - Local-first security guidance
+- [AGENTS.md](AGENTS.md) - Agent workflows and automation
+- [docs/plans/](docs/plans/) - Implementation plans and milestones
 
 ## Project Structure
 
@@ -549,8 +547,8 @@ SQLite uses WAL mode with `busy_timeout = 5000ms`. If you see "database is locke
 │       ├── embed.rs        # Embedding generation (Ollama)
 │       └── auto_org.rs     # Auto-organization (Claude)
 ├── web/                     # React frontend
-├── com.scott.note.plist    # macOS service configuration
-├── service.sh              # Service management script
+├── bin/deploy-service       # Immutable Homebrew runtime publisher
+├── service.sh               # Compatibility wrapper for Make/Homebrew
 └── litestream.yml          # SQLite backup configuration
 ```
 

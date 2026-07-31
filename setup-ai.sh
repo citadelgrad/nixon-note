@@ -49,13 +49,14 @@ echo ""
 
 # 3. Check Claude API
 echo "3. Auto-tagging (Claude API)"
-if grep -q "ANTHROPIC_API_KEY" ~/Library/LaunchAgents/com.scott.note.plist | grep -v "<!--"; then
+ENV_FILE="$HOME/.config/nixonnote/env"
+if [[ -f "$ENV_FILE" ]] && grep -qE '^(export[[:space:]]+)?ANTHROPIC_API_KEY=' "$ENV_FILE"; then
     log_info "Claude API key is configured"
 else
     log_warn "Claude API key not configured"
     echo "   1. Get API key from: https://console.anthropic.com/"
-    echo "   2. Edit com.scott.note.plist and set ANTHROPIC_API_KEY"
-    echo "   3. Run: ./service.sh reload"
+    echo "   2. Set ANTHROPIC_API_KEY in ~/.config/nixonnote/env"
+    echo "   3. Run: make restart"
 fi
 echo ""
 
