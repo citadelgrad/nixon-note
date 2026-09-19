@@ -6,8 +6,9 @@ Embeddings and voice transcription are intentionally local: Ollama handles note/
 
 ## Supported use
 
-- Run on localhost, a private LAN, or a private overlay network such as Tailscale.
-- Set `NOTE_TOKEN` before exposing the API beyond localhost.
+- By default the server binds to `127.0.0.1` (`NOTE_HOST`) and is not reachable from your LAN.
+- For remote access, prefer `tailscale serve`, which proxies from your tailnet to the loopback-only server without widening the bind address.
+- If you set `NOTE_HOST` to a non-loopback address (for example `0.0.0.0`, to reach it from a private LAN or overlay network such as Tailscale directly), set `NOTE_TOKEN` first.
 - Keep AI provider keys in environment variables or an untracked local env file. Never commit real keys.
 
 ## Public internet warning

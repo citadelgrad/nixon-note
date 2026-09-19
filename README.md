@@ -6,7 +6,7 @@ A self-hosted, AI-powered personal knowledge system. Capture thoughts (text, voi
 
 NixonNote is a personal project, published as a reference implementation rather than a product intended for broad use. It is opinionated, macOS-first, and shaped around one person's local workflow.
 
-It is meant to run locally on your own machine or private network. Do not host it publicly. If you expose it beyond localhost, put it behind a private network such as Tailscale or a trusted reverse proxy, set `NOTE_TOKEN`, and assume the app is handling private personal notes.
+It is meant to run locally on your own machine. By default the server binds to `127.0.0.1` only, so it is not reachable from your LAN or from other devices. Do not host it publicly, and do not set `NOTE_HOST` to a non-loopback address without also setting `NOTE_TOKEN`. For remote access from your other devices, prefer `tailscale serve` (see [Remote Access](#remote-access)) over widening the bind address.
 
 ## Features
 
@@ -153,6 +153,7 @@ Edit `~/.config/nixonnote/env` to configure production:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_PORT` | `9999` | Production port; exported to the app as `NOTE_PORT` |
+| `NOTE_HOST` | `127.0.0.1` | Bind address. Parsed as an IP address; an invalid value fails startup instead of falling back to `0.0.0.0`. |
 | `NOTE_DB` | `~/Library/Application Support/NixonNote/data/note.db` | SQLite database path |
 | `NOTE_WEB_DIR` | deployed runtime web directory | Set by the service wrapper |
 | `NOTE_TOKEN` | (unset) | Bearer token for API auth. Required before exposing beyond localhost. |
@@ -444,11 +445,39 @@ The chat endpoint (`POST /api/chat`) performs hybrid search:
 
 ## Remote Access
 
-Use [Tailscale](https://tailscale.com/) for secure remote access without port forwarding:
+NixonNote binds to `127.0.0.1` by default, so it is not reachable from other
+devices until you choose one of the options below.
 
-1. Install Tailscale on your Mac
-2. Connect to your Tailnet
-3. Access from any device: `http://your-mac-hostname.tailscale:9999`
+### Recommended: `tailscale serve`
+
+[Tailscale](https://tailscale.com/) can proxy a request from your tailnet to
+the loopback-only server, so you get remote access without widening the bind
+address or opening a port:
+
+1. Install Tailscale on your Mac and connect to your Tailnet.
+2. Run:
+   ```bash
+   /Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 9999
+   ```
+   (Use the app bundle's `Tailscale` binary, not a separately installed CLI;
+   a mismatched CLI can fail with a "bundleIdentifier is unknown" error.)
+3. Access from any device on your Tailnet: `https://your-mac-hostname.your-tailnet.ts.net`
+4. Check status any time with `tailscale serve status`, and remove it with `tailscale serve clear`.
+
+### Alternative: widen the bind address
+
+If you need the raw `host:9999` address to be reachable (for example a local
+phone client that cannot use the tailnet hostname), set `NOTE_HOST` in
+`~/.config/nixonnote/env`:
+
+```bash
+NOTE_HOST=0.0.0.0
+```
+
+or bind only to your Tailscale interface address instead of all interfaces.
+Whenever `NOTE_HOST` is not a loopback address, also set `NOTE_TOKEN` — the
+API has no other authentication, and anyone who can reach the bound address
+can read and write your notes.
 
 ## Backup
 
