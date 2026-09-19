@@ -1,5 +1,5 @@
 use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anyhow::{Context, Result, bail};
 use tracing_subscriber::EnvFilter;
@@ -8,6 +8,21 @@ use note::{AppState, background, create_router, db, mcp};
 
 fn db_path() -> String {
     env::var("NOTE_DB").unwrap_or_else(|_| "note.db".to_string())
+}
+
+/// Resolve the address the server binds to.
+///
+/// Defaults to loopback (`127.0.0.1`) so the server is not reachable from
+/// other devices unless `NOTE_HOST` is set explicitly. An invalid `NOTE_HOST`
+/// value is a hard error; it never silently falls back to an all-interfaces
+/// bind such as `0.0.0.0`.
+fn resolve_bind_host(note_host: Option<&str>) -> Result<IpAddr> {
+    match note_host {
+        None => Ok(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        Some(value) => value
+            .parse()
+            .with_context(|| format!("Invalid NOTE_HOST: {value:?}")),
+    }
 }
 
 // --- CLI mode ---
@@ -95,7 +110,9 @@ async fn run_server() -> Result<()> {
         .parse()
         .context("Invalid NOTE_PORT")?;
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let host = resolve_bind_host(env::var("NOTE_HOST").ok().as_deref())?;
+
+    let addr = SocketAddr::new(host, port);
     tracing::info!("Server listening on {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -123,5 +140,36 @@ async fn main() -> Result<()> {
         run_server().await
     } else {
         run_cli(&args)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::Ipv6Addr;
+
+    use super::*;
+
+    #[test]
+    fn resolve_bind_host_defaults_to_loopback() {
+        let host = resolve_bind_host(None).unwrap();
+        assert_eq!(host, IpAddr::V4(Ipv4Addr::LOCALHOST));
+    }
+
+    #[test]
+    fn resolve_bind_host_accepts_all_interfaces_override() {
+        let host = resolve_bind_host(Some("0.0.0.0")).unwrap();
+        assert_eq!(host, IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)));
+    }
+
+    #[test]
+    fn resolve_bind_host_accepts_ipv6_loopback_override() {
+        let host = resolve_bind_host(Some("::1")).unwrap();
+        assert_eq!(host, IpAddr::V6(Ipv6Addr::LOCALHOST));
+    }
+
+    #[test]
+    fn resolve_bind_host_rejects_invalid_value() {
+        let err = resolve_bind_host(Some("not-an-ip")).unwrap_err();
+        assert!(err.to_string().contains("NOTE_HOST"));
     }
 }

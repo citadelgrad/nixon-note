@@ -60,6 +60,7 @@ which avoids macOS restrictions when the checkout is on an external volume.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_PORT` | `9999` | Production port; exported to the app as `NOTE_PORT` |
+| `NOTE_HOST` | `127.0.0.1` | Bind address. Parsed as an IP address; an invalid value fails startup instead of falling back to `0.0.0.0`. |
 | `NOTE_DB` | `~/Library/Application Support/NixonNote/data/note.db` | SQLite database path |
 | `NOTE_WEB_DIR` | deployed runtime web directory | Set by the service wrapper |
 | `NOTE_TOKEN` | (unset) | Bearer token for API auth. Required before exposing beyond localhost. |
@@ -182,16 +183,37 @@ make deploy
 
 ## Remote Access (Tailscale)
 
-To access the service from other devices:
+The service binds to `127.0.0.1` by default (see `NOTE_HOST` above), so it is
+not reachable from other devices until you opt in.
 
-1. Install [Tailscale](https://tailscale.com/) on your Mac
-2. Connect to your Tailnet
+### Recommended: `tailscale serve`
+
+`tailscale serve` proxies a request from your tailnet to the loopback-only
+server, so remote devices can reach it without widening the bind address or
+opening a port:
+
+1. Install [Tailscale](https://tailscale.com/) on your Mac and connect to your Tailnet.
+2. Run:
+   ```bash
+   /Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 9999
+   ```
+   Use the `Tailscale` binary inside the app bundle. A separately installed
+   `tailscale` CLI (for example under `~/.local/bin`) can fail with
+   "bundleIdentifier is unknown".
 3. Access from any device on your Tailnet:
    ```
-   http://your-mac-hostname.tailscale:9999
+   https://your-mac-hostname.your-tailnet.ts.net
    ```
+4. Check the current config with `tailscale serve status`; remove it with `tailscale serve clear`.
 
-No need to open ports or configure firewalls.
+### Alternative: widen the bind address
+
+Set `NOTE_HOST=0.0.0.0` (or your Tailscale interface address) in
+`~/.config/nixonnote/env` if you need the service reachable at `host:9999`
+directly, for example for a client that cannot use the tailnet hostname.
+Firewall rules on your router or Mac still apply; opening the bind address
+does not by itself open a port through your network firewall. Always pair a
+non-loopback `NOTE_HOST` with `NOTE_TOKEN` — see "Adding Authentication" above.
 
 ## Backup with Litestream
 
@@ -215,7 +237,7 @@ For production use:
 2. **Use HTTPS**: Put behind Caddy or nginx with TLS
 3. **Set up backups**: Configure Litestream
 4. **Monitor logs**: Set up log rotation
-5. **Restrict network access**: Use Tailscale or firewall rules
+5. **Keep `NOTE_HOST` at its default (`127.0.0.1`)**: use `tailscale serve` for remote access instead of widening the bind address. If you must set `NOTE_HOST` to a non-loopback address, also set `NOTE_TOKEN` and add firewall rules.
 
 ## Uninstalling
 
