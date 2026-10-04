@@ -72,17 +72,6 @@ pub async fn auto_org_note(client: &reqwest::Client, pool: &Pool, note_id: i64) 
         .await
         .map_err(|e| anyhow::anyhow!("Pool interaction error: {e}"))??;
 
-    // Check if already has AI tags
-    let existing_tags = conn
-        .interact(move |conn| crate::db::queries::get_note_tags(conn, note_id))
-        .await
-        .map_err(|e| anyhow::anyhow!("Pool interaction error: {e}"))??;
-
-    if existing_tags.iter().any(|t| t.source == "ai") {
-        info!(note_id, "Note already has AI tags, skipping");
-        return Ok(());
-    }
-
     // Get API key from env
     let api_key = std::env::var("ANTHROPIC_API_KEY").context("ANTHROPIC_API_KEY not set")?;
 
@@ -92,7 +81,7 @@ pub async fn auto_org_note(client: &reqwest::Client, pool: &Pool, note_id: i64) 
         max_tokens: 1024,
         tools: vec![Tool {
             name: "organize_note".to_string(),
-            description: "Organize a captured note with title, summary, and tags".to_string(),
+            description: "Organize a captured note with a title and summary".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -103,14 +92,9 @@ pub async fn auto_org_note(client: &reqwest::Client, pool: &Pool, note_id: i64) 
                     "summary": {
                         "type": "string",
                         "description": "1-2 sentence summary"
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "3-7 relevant topic tags"
                     }
                 },
-                "required": ["title", "summary", "tags"]
+                "required": ["title", "summary"]
             }),
         }],
         tool_choice: ToolChoice {
@@ -148,7 +132,6 @@ pub async fn auto_org_note(client: &reqwest::Client, pool: &Pool, note_id: i64) 
     let api_usage = claude_res.usage;
 
     // Process organize_note tool call
-    let mut tags = Vec::new();
     let mut title: Option<String> = None;
     let mut summary: Option<String> = None;
 
@@ -167,51 +150,30 @@ pub async fn auto_org_note(client: &reqwest::Client, pool: &Pool, note_id: i64) 
                 summary = Some(s.to_string());
             }
 
-            // Extract tags
-            if let Some(tag_arr) = input.get("tags").and_then(|v| v.as_array()) {
-                for tag in tag_arr {
-                    if let Some(tag_str) = tag.as_str() {
-                        tags.push(tag_str.to_string());
-                    }
-                }
-            }
-
             break; // Only one organize_note call expected
         }
     }
 
     // Ensure we got the required fields
-    if title.is_none() || summary.is_none() || tags.is_empty() {
-        anyhow::bail!("Claude did not return all required fields (title, summary, tags)");
+    if title.is_none() || summary.is_none() {
+        anyhow::bail!("Claude did not return all required fields (title, summary)");
     }
 
     // Update note with title and summary
     let title_clone = title.clone();
     let summary_clone = summary.clone();
+    let expected_content = note.content;
     conn.interact(move |conn| {
         let mut stmt = conn.prepare(
-            "UPDATE notes SET title = COALESCE(?1, title), summary = COALESCE(?2, summary), updated_at = datetime('now') WHERE id = ?3"
+            "UPDATE notes
+             SET title = COALESCE(?1, title), summary = COALESCE(?2, summary), updated_at = datetime('now')
+             WHERE id = ?3 AND content = ?4"
         )?;
-        stmt.execute(rusqlite::params![title_clone, summary_clone, note_id])?;
+        stmt.execute(rusqlite::params![title_clone, summary_clone, note_id, expected_content])?;
         Ok::<(), rusqlite::Error>(())
     })
     .await
     .map_err(|e| anyhow::anyhow!("Pool interaction error: {e}"))??;
-
-    // Add tags
-    for tag_name in &tags {
-        let tag_name_clone = tag_name.clone();
-        let tag_id = conn
-            .interact(move |conn| crate::db::queries::upsert_tag(conn, &tag_name_clone))
-            .await
-            .map_err(|e| anyhow::anyhow!("Pool interaction error: {e}"))??;
-
-        conn.interact(move |conn| {
-            crate::db::queries::add_note_tag(conn, note_id, tag_id, 1.0, "ai")
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Pool interaction error: {e}"))??;
-    }
 
     // Record API usage
     if let Some(ref usage) = api_usage {
@@ -241,7 +203,7 @@ pub async fn auto_org_note(client: &reqwest::Client, pool: &Pool, note_id: i64) 
         }
     }
 
-    info!(note_id, title = ?title, summary = ?summary, tags = ?tags, "Auto-organized note");
+    info!(note_id, title = ?title, summary = ?summary, "Auto-organized note");
 
     Ok(())
 }
@@ -274,8 +236,7 @@ mod tests {
                         "name": "organize_note",
                         "input": {
                             "title": "Test Note Title",
-                            "summary": "This is a test summary.",
-                            "tags": ["test", "automation", "rust"]
+                            "summary": "This is a test summary."
                         }
                     }
                 ],
@@ -296,7 +257,7 @@ mod tests {
             max_tokens: 1024,
             tools: vec![Tool {
                 name: "organize_note".to_string(),
-                description: "Organize a captured note with title, summary, and tags".to_string(),
+                description: "Organize a captured note with a title and summary".to_string(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -307,14 +268,9 @@ mod tests {
                         "summary": {
                             "type": "string",
                             "description": "1-2 sentence summary"
-                        },
-                        "tags": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "3-7 relevant topic tags"
                         }
                     },
-                    "required": ["title", "summary", "tags"]
+                    "required": ["title", "summary"]
                 }),
             }],
             tool_choice: ToolChoice {
@@ -353,10 +309,7 @@ mod tests {
                     input.get("summary").and_then(|v| v.as_str()),
                     Some("This is a test summary.")
                 );
-                assert_eq!(
-                    input.get("tags").and_then(|v| v.as_array()).unwrap().len(),
-                    3
-                );
+
                 found_tool = true;
             }
         }
@@ -381,7 +334,7 @@ mod tests {
                         "name": "organize_note",
                         "input": {
                             "title": "Test Title",
-                            // Missing summary and tags
+                            // Missing summary
                         }
                     }
                 ],
@@ -401,15 +354,14 @@ mod tests {
             max_tokens: 1024,
             tools: vec![Tool {
                 name: "organize_note".to_string(),
-                description: "Organize a captured note with title, summary, and tags".to_string(),
+                description: "Organize a captured note with a title and summary".to_string(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {
                         "title": {"type": "string"},
-                        "summary": {"type": "string"},
-                        "tags": {"type": "array", "items": {"type": "string"}}
+                        "summary": {"type": "string"}
                     },
-                    "required": ["title", "summary", "tags"]
+                    "required": ["title", "summary"]
                 }),
             }],
             tool_choice: ToolChoice {
@@ -436,7 +388,6 @@ mod tests {
         // Verify parsing succeeds but fields are missing
         let mut title: Option<String> = None;
         let mut summary: Option<String> = None;
-        let mut tags = Vec::new();
 
         for content in claude_res.content {
             if let Content::ToolUse { name, input, .. } = content {
@@ -447,21 +398,13 @@ mod tests {
                     if let Some(s) = input.get("summary").and_then(|v| v.as_str()) {
                         summary = Some(s.to_string());
                     }
-                    if let Some(tag_arr) = input.get("tags").and_then(|v| v.as_array()) {
-                        for tag in tag_arr {
-                            if let Some(tag_str) = tag.as_str() {
-                                tags.push(tag_str.to_string());
-                            }
-                        }
-                    }
                 }
             }
         }
 
-        // Should have title but missing summary and tags
+        // Should have title but missing summary
         assert!(title.is_some());
         assert!(summary.is_none());
-        assert!(tags.is_empty());
     }
 
     #[tokio::test]
@@ -492,10 +435,9 @@ mod tests {
                     "type": "object",
                     "properties": {
                         "title": {"type": "string"},
-                        "summary": {"type": "string"},
-                        "tags": {"type": "array"}
+                        "summary": {"type": "string"}
                     },
-                    "required": ["title", "summary", "tags"]
+                    "required": ["title", "summary"]
                 }),
             }],
             tool_choice: ToolChoice {

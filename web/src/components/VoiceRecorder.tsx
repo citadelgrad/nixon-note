@@ -1,115 +1,118 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from "react";
 
 interface VoiceRecorderProps {
-  onComplete: () => void
-  disabled?: boolean
+  onComplete: () => void;
+  disabled?: boolean;
 }
 
 function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 export function VoiceRecorder({ onComplete, disabled }: VoiceRecorderProps) {
-  const [isRecording, setIsRecording] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [duration, setDuration] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const autoStopTimerRef = useRef<number | null>(null)
-  const durationTimerRef = useRef<number | null>(null)
-  const errorTimerRef = useRef<number | null>(null)
+  const [isRecording, setIsRecording] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const autoStopTimerRef = useRef<number | null>(null);
+  const durationTimerRef = useRef<number | null>(null);
+  const errorTimerRef = useRef<number | null>(null);
 
   // Duration timer effect
   useEffect(() => {
     if (isRecording) {
-      setDuration(0)
+      setDuration(0);
       durationTimerRef.current = window.setInterval(() => {
-        setDuration((prev) => prev + 1)
-      }, 1000)
+        setDuration((prev) => prev + 1);
+      }, 1000);
     } else {
       if (durationTimerRef.current) {
-        clearInterval(durationTimerRef.current)
-        durationTimerRef.current = null
+        clearInterval(durationTimerRef.current);
+        durationTimerRef.current = null;
       }
     }
 
     return () => {
       if (durationTimerRef.current) {
-        clearInterval(durationTimerRef.current)
-        durationTimerRef.current = null
+        clearInterval(durationTimerRef.current);
+        durationTimerRef.current = null;
       }
-    }
-  }, [isRecording])
+    };
+  }, [isRecording]);
 
   // Auto-dismiss error after 5 seconds
   useEffect(() => {
     if (error) {
       if (errorTimerRef.current) {
-        clearTimeout(errorTimerRef.current)
+        clearTimeout(errorTimerRef.current);
       }
       errorTimerRef.current = window.setTimeout(() => {
-        setError(null)
-        errorTimerRef.current = null
-      }, 5000)
+        setError(null);
+        errorTimerRef.current = null;
+      }, 5000);
     }
 
     return () => {
       if (errorTimerRef.current) {
-        clearTimeout(errorTimerRef.current)
-        errorTimerRef.current = null
+        clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = null;
       }
-    }
-  }, [error])
+    };
+  }, [error]);
 
   async function startRecording() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm',
-      })
+        mimeType: "audio/webm",
+      });
 
-      chunksRef.current = []
+      chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          chunksRef.current.push(e.data)
+          chunksRef.current.push(e.data);
         }
-      }
+      };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        await uploadAudio(blob)
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        await uploadAudio(blob);
 
         // Stop all tracks to release microphone
-        stream.getTracks().forEach((track) => track.stop())
-      }
+        stream.getTracks().forEach((track) => track.stop());
+      };
 
-      mediaRecorderRef.current = mediaRecorder
-      mediaRecorder.start()
-      setIsRecording(true)
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsRecording(true);
 
       // Auto-stop after 10 minutes to prevent accidental long recordings
-      autoStopTimerRef.current = window.setTimeout(() => {
-        stopRecording()
-      }, 10 * 60 * 1000)
+      autoStopTimerRef.current = window.setTimeout(
+        () => {
+          stopRecording();
+        },
+        10 * 60 * 1000,
+      );
     } catch (err) {
-      console.error('Failed to start recording:', err)
-      setError('Failed to access microphone. Please allow microphone access.')
+      console.error("Failed to start recording:", err);
+      setError("Failed to access microphone. Please allow microphone access.");
     }
   }
 
   function stopRecording() {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
 
       // Clear auto-stop timer
       if (autoStopTimerRef.current) {
-        clearTimeout(autoStopTimerRef.current)
-        autoStopTimerRef.current = null
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
       }
     }
   }
@@ -117,50 +120,52 @@ export function VoiceRecorder({ onComplete, disabled }: VoiceRecorderProps) {
   function cancelRecording() {
     if (mediaRecorderRef.current && isRecording) {
       // Stop the recorder without triggering onstop upload
-      mediaRecorderRef.current.ondataavailable = null
-      mediaRecorderRef.current.onstop = null
-      mediaRecorderRef.current.stop()
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
 
       // Stop all tracks to release microphone
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop())
+      mediaRecorderRef.current.stream
+        .getTracks()
+        .forEach((track) => track.stop());
 
-      setIsRecording(false)
-      chunksRef.current = []
+      setIsRecording(false);
+      chunksRef.current = [];
 
       // Clear auto-stop timer
       if (autoStopTimerRef.current) {
-        clearTimeout(autoStopTimerRef.current)
-        autoStopTimerRef.current = null
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
       }
     }
   }
 
   async function uploadAudio(blob: Blob) {
-    setIsUploading(true)
+    setIsUploading(true);
 
     try {
-      const formData = new FormData()
-      formData.append('file', blob, 'recording.webm')
+      const formData = new FormData();
+      formData.append("file", blob, "recording.webm");
 
-      const token = localStorage.getItem('note_token') ?? ''
-      const res = await fetch('/api/voice', {
-        method: 'POST',
+      const token = localStorage.getItem("note_token") ?? "";
+      const res = await fetch("/api/voice", {
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: formData,
-      })
+      });
 
       if (!res.ok) {
-        throw new Error(`Upload failed: ${res.status}`)
+        throw new Error(`Upload failed: ${res.status}`);
       }
 
-      onComplete()
+      onComplete();
     } catch (err) {
-      console.error('Failed to upload audio:', err)
-      setError('Failed to upload recording. Please try again.')
+      console.error("Failed to upload audio:", err);
+      setError("Failed to upload recording. Please try again.");
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
   }
 
@@ -176,8 +181,19 @@ export function VoiceRecorder({ onComplete, disabled }: VoiceRecorderProps) {
               className="shrink-0 text-white/80 hover:text-white"
               aria-label="Dismiss error"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -255,7 +271,12 @@ export function VoiceRecorder({ onComplete, disabled }: VoiceRecorderProps) {
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -286,5 +307,5 @@ export function VoiceRecorder({ onComplete, disabled }: VoiceRecorderProps) {
         </div>
       )}
     </div>
-  )
+  );
 }

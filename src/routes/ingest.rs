@@ -1,10 +1,160 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 use tracing::info;
+use url::{Host, Url};
 
 use crate::AppState;
 use crate::db::queries;
 use crate::routes::notes::flatten_interact;
+
+const MAX_CLIPPED_HTML_BYTES: usize = 5 * 1024 * 1024;
+
+fn is_public_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(ip) => is_public_ipv4(ip),
+        std::net::IpAddr::V6(ip) => {
+            if let Some(mapped) = ip.to_ipv4_mapped() {
+                return is_public_ipv4(mapped);
+            }
+            let segments = ip.segments();
+            let global_unicast = (segments[0] & 0xe000) == 0x2000;
+            let documentation = segments[0] == 0x2001 && segments[1] == 0x0db8;
+            let orchid = segments[0] == 0x2001 && matches!(segments[1], 0x0010..=0x002f);
+            global_unicast && !documentation && !orchid
+        }
+    }
+}
+
+fn is_public_ipv4(ip: std::net::Ipv4Addr) -> bool {
+    let [a, b, c, _] = ip.octets();
+    !matches!(
+        (a, b, c),
+        (0, _, _)
+            | (10, _, _)
+            | (100, 64..=127, _)
+            | (127, _, _)
+            | (169, 254, _)
+            | (172, 16..=31, _)
+            | (192, 0, 0)
+            | (192, 0, 2)
+            | (192, 88, 99)
+            | (192, 168, _)
+            | (198, 18..=19, _)
+            | (198, 51, 100)
+            | (203, 0, 113)
+            | (224..=255, _, _)
+    )
+}
+
+async fn safe_web_client(url: &Url) -> Result<reqwest::Client, AppError> {
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(AppError::BadRequest(
+            "URL must use http:// or https://".to_string(),
+        ));
+    }
+
+    let host = url
+        .host()
+        .ok_or_else(|| AppError::BadRequest("URL must include a host".to_string()))?;
+    let mut builder = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(30));
+
+    match host {
+        Host::Ipv4(ip) => {
+            if !is_public_ip(ip.into()) {
+                return Err(AppError::BadRequest(
+                    "Private network URLs are not allowed".into(),
+                ));
+            }
+        }
+        Host::Ipv6(ip) => {
+            if !is_public_ip(ip.into()) {
+                return Err(AppError::BadRequest(
+                    "Private network URLs are not allowed".into(),
+                ));
+            }
+        }
+        Host::Domain(domain) => {
+            if domain.eq_ignore_ascii_case("localhost") || domain.ends_with(".localhost") {
+                return Err(AppError::BadRequest(
+                    "Private network URLs are not allowed".into(),
+                ));
+            }
+            let port = url.port_or_known_default().ok_or_else(|| {
+                AppError::BadRequest("URL must use a standard HTTP port".to_string())
+            })?;
+            let addresses: Vec<_> = tokio::net::lookup_host((domain, port))
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Could not resolve URL host: {e}")))?
+                .collect();
+            if addresses.is_empty() || addresses.iter().any(|addr| !is_public_ip(addr.ip())) {
+                return Err(AppError::BadRequest(
+                    "Private network URLs are not allowed".into(),
+                ));
+            }
+            builder = builder.resolve_to_addrs(domain, &addresses);
+        }
+    }
+
+    builder
+        .build()
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to build HTTP client: {e}")))
+}
+
+async fn fetch_public_html(raw_url: &str) -> Result<(Url, String), AppError> {
+    let mut url =
+        Url::parse(raw_url).map_err(|e| AppError::BadRequest(format!("Invalid URL: {e}")))?;
+
+    for _ in 0..=5 {
+        let client = safe_web_client(&url).await?;
+        let mut response = client
+            .get(url.clone())
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .send()
+            .await
+            .map_err(|e| AppError::BadRequest(format!("Failed to fetch URL: {e}")))?;
+
+        if response.status().is_redirection() {
+            let location = response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| AppError::BadRequest("Redirect omitted Location header".into()))?;
+            url = url
+                .join(location)
+                .map_err(|e| AppError::BadRequest(format!("Invalid redirect URL: {e}")))?;
+            continue;
+        }
+
+        if !response.status().is_success() {
+            return Err(AppError::BadRequest(format!(
+                "Failed to fetch article: {} {}",
+                response.status().as_u16(),
+                response.status().canonical_reason().unwrap_or("Unknown")
+            )));
+        }
+
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| AppError::BadRequest(format!("Failed to read response body: {e}")))?
+        {
+            if bytes.len().saturating_add(chunk.len()) > MAX_CLIPPED_HTML_BYTES {
+                return Err(AppError::BadRequest(
+                    "Article exceeds the 5 MiB limit".into(),
+                ));
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        return Ok((url, String::from_utf8_lossy(&bytes).into_owned()));
+    }
+
+    Err(AppError::BadRequest("Too many URL redirects".into()))
+}
 
 // ============================================
 // Bookmarks Ingestion
@@ -16,8 +166,6 @@ pub struct Bookmark {
     pub url: String,
     #[serde(default)]
     pub notes: Option<String>,
-    #[serde(default)]
-    pub tags: Option<Vec<String>>,
 }
 
 #[derive(Deserialize)]
@@ -66,7 +214,7 @@ pub async fn import_bookmarks(
             Ok(note_id) => {
                 note_ids.push(note_id);
 
-                // Queue for background processing (embeddings, auto-tagging)
+                // Queue for background processing (embedding and organization)
                 let _ = state.background.enqueue(note_id).await;
             }
             Err(_) => failed += 1,
@@ -491,8 +639,21 @@ async fn summarize_with_gemini(
 
 /// Check if a URL is a Twitter/X.com tweet URL
 fn is_twitter_url(url: &str) -> bool {
-    let lower = url.to_lowercase();
-    (lower.contains("x.com/") || lower.contains("twitter.com/")) && lower.contains("/status/")
+    let Ok(url) = Url::parse(url) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    matches!(
+        host.to_ascii_lowercase().as_str(),
+        "x.com"
+            | "www.x.com"
+            | "mobile.x.com"
+            | "twitter.com"
+            | "www.twitter.com"
+            | "mobile.twitter.com"
+    ) && url.path().contains("/status/")
 }
 
 // --- FxTwitter API response types ---
@@ -619,8 +780,10 @@ fn article_blocks_to_markdown(blocks: &[FxArticleBlock]) -> String {
 /// Handles both "Tue Feb 17 17:03:45 +0000 2026" and ISO "2026-02-17T17:03:45.000Z".
 fn format_tweet_date(created_at: &str) -> String {
     // ISO 8601: "2026-02-17T17:03:45.000Z"
-    if created_at.contains('T') && created_at.contains('-') {
-        let date_part = &created_at[..10]; // "2026-02-17"
+    if let Some(date_part) = created_at
+        .get(..10)
+        .filter(|date| date.as_bytes()[4] == b'-' && date.as_bytes()[7] == b'-')
+    {
         let parts: Vec<&str> = date_part.split('-').collect();
         if parts.len() == 3 {
             let month = match parts[1] {
@@ -759,13 +922,6 @@ async fn ingest_tweet(
             .await,
     )?;
 
-    // Apply tags
-    let mut tags = body.tags.clone().unwrap_or_default();
-    if !tags.iter().any(|t| t == "tweet") {
-        tags.push("tweet".to_string());
-    }
-    crate::routes::notes::add_tags_to_note(&state.pool, note_id, tags).await?;
-
     // Queue for background processing
     let _ = state.background.enqueue(note_id).await;
 
@@ -779,7 +935,7 @@ async fn ingest_tweet(
 
 /// Truncate text to a maximum length, adding "..." if truncated
 fn truncate_text(text: &str, max_len: usize) -> String {
-    if text.len() <= max_len {
+    if text.chars().count() <= max_len {
         text.to_string()
     } else {
         let truncated: String = text.chars().take(max_len).collect();
@@ -875,8 +1031,6 @@ fn is_list_like_link_line(line: &str) -> bool {
 #[derive(Deserialize)]
 pub struct UrlIngestRequest {
     pub url: String,
-    #[serde(default)]
-    pub tags: Option<Vec<String>>,
 }
 
 #[derive(Serialize)]
@@ -895,10 +1049,12 @@ pub async fn ingest_url(
 ) -> Result<Json<UrlIngestResponse>, AppError> {
     use dom_smoothie::Readability;
 
-    // 1. Validate URL
-    if !body.url.starts_with("http://") && !body.url.starts_with("https://") {
+    // 1. Parse URL before any network access.
+    let parsed_url = Url::parse(&body.url)
+        .map_err(|e| AppError::BadRequest(format!("URL must use http:// or https://: {e}")))?;
+    if !matches!(parsed_url.scheme(), "http" | "https") {
         return Err(AppError::BadRequest(
-            "URL must start with http:// or https://".to_string(),
+            "URL must use http:// or https://".into(),
         ));
     }
 
@@ -925,33 +1081,12 @@ pub async fn ingest_url(
         return ingest_tweet(&state, &body).await;
     }
 
-    // 3. Fetch HTML
-    let response = state
-        .client
-        .get(&body.url)
-        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-        .header("Accept-Language", "en-US,en;q=0.9")
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to fetch URL: {e}")))?;
-
-    if !response.status().is_success() {
-        return Err(AppError::BadRequest(format!(
-            "Failed to fetch article: {} {}",
-            response.status().as_u16(),
-            response.status().canonical_reason().unwrap_or("Unknown")
-        )));
-    }
-
-    let html = response
-        .text()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to read response body: {e}")))?;
+    // 3. Fetch HTML with private-network, redirect, timeout, and body-size guards.
+    let (final_url, html) = fetch_public_html(&body.url).await?;
 
     // 4-7. Parse article and convert to markdown (synchronous, non-Send types)
     let (title, content, word_count) = {
-        let mut readability = Readability::new(html, Some(&body.url), None)
+        let mut readability = Readability::new(html, Some(final_url.as_str()), None)
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to parse HTML: {e}")))?;
 
         if !readability.is_probably_readable() {
@@ -972,14 +1107,9 @@ pub async fn ingest_url(
         })?;
         let markdown = clean_clipped_markdown(&markdown);
 
-        let domain = body
-            .url
-            .split("//")
-            .nth(1)
-            .and_then(|s| s.split('/').next())
-            .unwrap_or(&body.url);
+        let domain = final_url.host_str().unwrap_or(final_url.as_str());
 
-        let mut meta_line = format!("> Clipped from [{}]({})", domain, body.url);
+        let mut meta_line = format!("> Clipped from [{}]({})", domain, final_url);
         if let Some(ref byline) = article.byline {
             meta_line.push_str(&format!("\n> By {}", byline));
         }
@@ -1014,11 +1144,7 @@ pub async fn ingest_url(
             .await,
     )?;
 
-    // 9. Apply tags
-    let tags = body.tags.unwrap_or_else(|| vec!["web-clip".to_string()]);
-    crate::routes::notes::add_tags_to_note(&state.pool, note_id, tags).await?;
-
-    // 10. Enqueue for background processing
+    // 9. Enqueue for background processing
     let _ = state.background.enqueue(note_id).await;
 
     Ok(Json(UrlIngestResponse {
@@ -1059,6 +1185,30 @@ impl From<anyhow::Error> for AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn private_and_local_ip_targets_are_rejected() {
+        for ip in [
+            "127.0.0.1",
+            "10.0.0.1",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "198.18.0.1",
+            "0.0.0.0",
+            "::1",
+            "fc00::1",
+            "fe80::1",
+            "::ffff:127.0.0.1",
+            "::ffff:169.254.169.254",
+            "2001:db8::1",
+        ] {
+            assert!(!is_public_ip(ip.parse().unwrap()), "{ip} must be rejected");
+        }
+        assert!(is_public_ip("8.8.8.8".parse().unwrap()));
+        assert!(is_public_ip("2606:4700:4700::1111".parse().unwrap()));
+    }
 
     #[test]
     fn test_extract_video_id_standard_url() {
@@ -1419,6 +1569,10 @@ talk<00:00:05.220> about<00:00:05.520> Rust
     fn test_is_twitter_url_rejects_non_tweet() {
         assert!(!is_twitter_url("https://x.com/user"));
         assert!(!is_twitter_url("https://example.com/status/123"));
+        assert!(!is_twitter_url("https://example.com/x.com/user/status/123"));
+        assert!(!is_twitter_url(
+            "https://x.com.evil.example/user/status/123"
+        ));
         assert!(!is_twitter_url("https://youtube.com/watch?v=abc"));
     }
 
@@ -1446,6 +1600,8 @@ talk<00:00:05.220> about<00:00:05.520> Rust
     #[test]
     fn test_truncate_text() {
         assert_eq!(truncate_text("short", 80), "short");
+        assert_eq!(truncate_text("éééééé", 10), "éééééé");
+        assert_eq!(truncate_text("🙂🙂🙂🙂🙂🙂", 10), "🙂🙂🙂🙂🙂🙂");
         let long = "a".repeat(100);
         let result = truncate_text(&long, 80);
         assert!(result.len() <= 84); // 80 chars + "..."

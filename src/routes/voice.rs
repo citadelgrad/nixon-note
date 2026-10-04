@@ -1,3 +1,4 @@
+use anyhow::Context;
 use axum::{
     Json,
     extract::{Multipart, State},
@@ -96,7 +97,7 @@ pub async fn transcribe_voice(
             .await,
     )?;
 
-    // Enqueue for background processing (embedding + auto-tagging)
+    // Enqueue for background processing (embedding + organization)
     if let Err(e) = state.background.enqueue(id).await {
         warn!(note_id = id, error = ?e, "Failed to enqueue note for processing");
     }
@@ -181,13 +182,12 @@ async fn transcribe_with_whisper(
     // Run transcription in async context (ModelHandler::new is async)
     let audio_bytes = audio_bytes.to_vec();
     // Save audio to temp file and convert WebM to WAV for whisper compatibility
-    let tmp_dir = std::env::temp_dir();
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or_default();
-    let tmp_filename = format!("nixonnote_voice_{}_{}.webm", std::process::id(), nonce);
-    let tmp_webm_path = tmp_dir.join(&tmp_filename);
+    let tmp_webm = tempfile::Builder::new()
+        .prefix("nixonnote_voice_")
+        .suffix(".webm")
+        .tempfile()
+        .context("Failed to create temporary WebM file")?;
+    let tmp_webm_path = tmp_webm.path().to_path_buf();
 
     tokio::fs::write(&tmp_webm_path, &audio_bytes)
         .await
@@ -196,11 +196,12 @@ async fn transcribe_with_whisper(
     info!("Audio saved to temp file: {:?}", tmp_webm_path);
 
     // Convert WebM to WAV using ffmpeg (whisper requires 16kHz mono WAV)
-    let tmp_wav_path = tmp_dir.join(format!(
-        "nixonnote_voice_{}_{}.wav",
-        std::process::id(),
-        nonce
-    ));
+    let tmp_wav = tempfile::Builder::new()
+        .prefix("nixonnote_voice_")
+        .suffix(".wav")
+        .tempfile()
+        .context("Failed to create temporary WAV file")?;
+    let tmp_wav_path = tmp_wav.path().to_path_buf();
 
     let ffmpeg_result = tokio::process::Command::new("/opt/homebrew/bin/ffmpeg")
         .arg("-i")
@@ -248,9 +249,6 @@ async fn transcribe_with_whisper(
     // Create transcriber and run transcription (CPU-intensive)
     let trans = transcriber::Transcriber::new(model_handler);
 
-    // Clone path for cleanup after transcription
-    let tmp_path_for_cleanup = tmp_path.clone();
-
     let result = tokio::task::spawn_blocking(move || {
         trans
             .transcribe(&tmp_path.to_string_lossy(), None)
@@ -263,10 +261,6 @@ async fn transcribe_with_whisper(
 
     // Extract text from result
     let text = result.get_text().to_string();
-
-    // Clean up temp files
-    tokio::fs::remove_file(&tmp_path_for_cleanup).await.ok();
-    tokio::fs::remove_file(&tmp_webm_path).await.ok();
 
     Ok(text)
 }

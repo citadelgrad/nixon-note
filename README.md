@@ -11,7 +11,7 @@ It is meant to run locally on your own machine. By default the server binds to `
 ## Features
 
 - **Zero-friction capture** - CLI, web UI, and voice input
-- **AI auto-organization** - Claude API tags and summarizes automatically
+- **AI auto-organization** - Claude API generates titles and summaries automatically
 - **Powerful search** - Full-text search (FTS5) + vector similarity (sqlite-vec)
 - **Local-first** - SQLite database, runs entirely on your machine
 - **Voice transcription** - Osaurus (Whisper) for local speech-to-text
@@ -29,7 +29,7 @@ It is meant to run locally on your own machine. By default the server binds to `
 
 Configure these for enhanced features:
 
-1. **Claude API** (auto-tagging and summarization)
+1. **Claude API** (automatic titles and summaries)
    - Get your key at [console.anthropic.com](https://console.anthropic.com/)
    - Add `ANTHROPIC_API_KEY=...` to `~/.config/nixonnote/env`
 
@@ -139,7 +139,7 @@ make deploy
 ```
 
 Each deployment creates an immutable release and atomically updates the
-`runtime/current` symlink. If either the web root or `/api/status` fails after
+`runtime/current` symlink. If either the web root or `/api/health` fails after
 restart, deployment restores the previous runtime and restarts the service.
 
 ## Configuration
@@ -153,7 +153,7 @@ Edit `~/.config/nixonnote/env` to configure production:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_PORT` | `9999` | Production port; exported to the app as `NOTE_PORT` |
-| `NOTE_HOST` | `127.0.0.1` | Bind address. Parsed as an IP address; an invalid value fails startup instead of falling back to `0.0.0.0`. |
+| `NOTE_HOST` | `127.0.0.1` | Bind address. Invalid values fail startup; non-loopback addresses require `NOTE_TOKEN`. |
 | `NOTE_DB` | `~/Library/Application Support/NixonNote/data/note.db` | SQLite database path |
 | `NOTE_WEB_DIR` | deployed runtime web directory | Set by the service wrapper |
 | `NOTE_TOKEN` | (unset) | Bearer token for API auth. Required before exposing beyond localhost. |
@@ -163,7 +163,7 @@ Edit `~/.config/nixonnote/env` to configure production:
 
 | Variable | Description | How to Get |
 |----------|-------------|------------|
-| `ANTHROPIC_API_KEY` | Claude API for auto-tagging and summarization | [Get key at console.anthropic.com](https://console.anthropic.com/) |
+| `ANTHROPIC_API_KEY` | Claude API for automatic titles and summaries | [Get key at console.anthropic.com](https://console.anthropic.com/) |
 | `GEMINI_API_KEY` | Gemini API for conversational chat | [Get key at aistudio.google.com](https://aistudio.google.com/apikey) |
 | `OLLAMA_URL` | Ollama endpoint for local embeddings | Default: `http://localhost:11434`. [Install Ollama](https://ollama.ai/), then run `ollama pull nomic-embed-text` |
 
@@ -185,7 +185,7 @@ NOTE_TOKEN=your-secret-token-here
 
 All API requests will then require an `Authorization` header with your bearer token.
 
-Do not expose NixonNote to the public internet without `NOTE_TOKEN` and a trusted network boundary such as Tailscale or a reverse proxy with authentication. The only unauthenticated API endpoint is `/api/status`.
+Do not expose NixonNote to the public internet without `NOTE_TOKEN` and a trusted network boundary such as Tailscale or a reverse proxy with authentication. The only unauthenticated API endpoint is the minimal `/api/health` liveness check.
 
 ## Development
 
@@ -220,8 +220,7 @@ Import all installed packages with metadata:
 ```
 
 This creates one note per package with version, description, and homepage. Each note is:
-- Tagged with `hidden` (to filter from default view) and `tool`
-- Tagged with `source_type: "homebrew"` and `source_url` set to the package name for deduplication
+- Marked with `source_type: "homebrew"` and `source_url` set to the package name for deduplication
 
 **Example output:**
 ```
@@ -251,8 +250,7 @@ Import Microsoft Edge or Brave bookmarks (both use the same format):
 ```
 
 This recursively walks your bookmark folders and creates one note per bookmark with folder context. Each note is:
-- Tagged with `hidden` (to filter from default view) and `bookmark`
-- Tagged with `source_type: "bookmark"` and `source_url` set to the URL for deduplication
+- Marked with `source_type: "bookmark"` and `source_url` set to the URL for deduplication
 
 **Custom bookmark file location:**
 ```bash
@@ -295,22 +293,9 @@ curl "http://localhost:9999/api/notes?q=bookmark github"
 
 Or use the web UI at http://localhost:9999 to browse and search.
 
-### Filtering Hidden Items
+### Filtering Imported Items
 
-Imported items are tagged with `hidden` to keep them out of your default note stream. To include them in searches, explicitly filter by tag:
-
-```bash
-# Show all hidden items
-curl "http://localhost:9999/api/tags/filter?tag=hidden"
-
-# Show all tools (Homebrew packages)
-curl "http://localhost:9999/api/tags/filter?tag=tool"
-
-# Show all bookmarks
-curl "http://localhost:9999/api/tags/filter?tag=bookmark"
-```
-
-The web UI can be updated to exclude notes with the `hidden` tag from the default view.
+The web UI's “Hide imported items” control filters Homebrew and bookmark notes by `source_type`. Turn it off to include imported notes in the default stream.
 
 ## CLI Usage
 
@@ -327,16 +312,12 @@ Notes are saved immediately to SQLite. Background tasks will auto-organize them 
 ## API Endpoints
 
 ### Notes
-- `GET /api/notes` - List notes (with pagination, search, tags)
+- `GET /api/notes` - List notes (with pagination, search, and imported-item filtering)
 - `POST /api/notes` - Create single note
 - `POST /api/notes/batch` - Create multiple notes in one transaction (up to 1000)
 - `GET /api/notes/{id}` - Get note by ID
 - `PUT /api/notes/{id}` - Update note content
 - `DELETE /api/notes/{id}` - Delete note
-
-### Tags & Organization
-- `GET /api/tags` - List all tags with counts
-- `GET /api/tags/filter` - Filter notes by tag
 
 ### AI Features
 - `POST /api/voice` - Transcribe voice recording
@@ -353,13 +334,11 @@ curl -X POST http://localhost:9999/api/notes/batch \
       {
         "content": "# My First Note\n\nContent here",
         "source_type": "import",
-        "source_url": "optional-dedup-key",
-        "tags": ["hidden", "archived"]
+        "source_url": "optional-dedup-key"
       },
       {
         "content": "# My Second Note\n\nMore content",
-        "source_type": "import",
-        "tags": ["draft"]
+        "source_type": "import"
       }
     ]
   }'
@@ -539,7 +518,7 @@ SQLite uses WAL mode with `busy_timeout = 5000ms`. If you see "database is locke
 2. Restart: `make restart`
 3. Get a key at: https://aistudio.google.com/apikey
 
-**Notes not being auto-tagged**:
+**Notes not receiving automatic titles or summaries**:
 1. Check if `ANTHROPIC_API_KEY` is set in `~/.config/nixonnote/env`
 2. Check logs for errors: `./service.sh logs | grep -i anthropic`
 3. Get a key at: https://console.anthropic.com/
@@ -568,7 +547,7 @@ SQLite uses WAL mode with `busy_timeout = 5000ms`. If you see "database is locke
 │   │   └── queries.rs      # SQL queries
 │   ├── routes/
 │   │   ├── notes.rs        # Notes CRUD endpoints
-│   │   ├── tags.rs         # Tag endpoints
+
 │   │   ├── voice.rs        # Voice transcription
 │   │   └── chat.rs         # AI chat endpoint
 │   └── background/

@@ -125,6 +125,11 @@ INSERT INTO settings (key, value) VALUES ('tts_provider', 'openai');
 INSERT INTO settings (key, value) VALUES ('tts_voice_openai', 'alloy');
 INSERT INTO settings (key, value) VALUES ('tts_voice_gemini', 'Kore');",
         ),
+        M::up(
+            "-- Migration 5: remove retired tags functionality
+DROP TABLE note_tags;
+DROP TABLE tags;",
+        ),
     ])
 }
 
@@ -155,6 +160,17 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM notes", [], |r| r.get(0))
             .unwrap();
         assert_eq!(count, 0);
+
+        for table in ["tags", "note_tags"] {
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                    [table],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "legacy tag table {table} still exists");
+        }
     }
 
     #[test]

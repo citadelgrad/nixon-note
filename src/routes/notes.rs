@@ -15,8 +15,6 @@ pub struct CreateNote {
     #[serde(default = "default_source")]
     pub source_type: String,
     pub source_url: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -46,7 +44,8 @@ pub struct NotesQuery {
     pub limit: i64,
     #[serde(default)]
     pub offset: i64,
-    pub exclude_tag: Option<String>,
+    #[serde(default)]
+    pub hide_imported: bool,
 }
 
 fn default_limit() -> i64 {
@@ -72,60 +71,6 @@ pub fn flatten_interact<T>(
     }
 }
 
-/// Helper to populate tags for notes
-async fn populate_tags(
-    pool: &deadpool_sqlite::Pool,
-    notes: Vec<queries::Note>,
-) -> anyhow::Result<Vec<queries::Note>> {
-    if notes.is_empty() {
-        return Ok(notes);
-    }
-
-    flatten_interact(
-        pool.get()
-            .await
-            .map_err(anyhow::Error::from)?
-            .interact(move |conn| queries::populate_note_tags(conn, notes))
-            .await,
-    )
-}
-
-/// Helper to add tags to a note
-pub async fn add_tags_to_note(
-    pool: &deadpool_sqlite::Pool,
-    note_id: i64,
-    tags: Vec<String>,
-) -> anyhow::Result<()> {
-    if tags.is_empty() {
-        return Ok(());
-    }
-
-    flatten_interact(
-        pool.get()
-            .await
-            .map_err(anyhow::Error::from)?
-            .interact(move |conn| {
-                for tag_name in tags {
-                    let tag_id = queries::upsert_tag(conn, &tag_name)?;
-                    queries::add_note_tag(conn, note_id, tag_id, 1.0, "manual")?;
-                }
-                Ok(())
-            })
-            .await,
-    )
-}
-
-/// Helper to filter notes by excluding a specific tag
-fn filter_notes_by_excluded_tag(
-    notes: Vec<queries::Note>,
-    exclude_tag: &str,
-) -> Vec<queries::Note> {
-    notes
-        .into_iter()
-        .filter(|note| !note.tags.iter().any(|t| t == exclude_tag))
-        .collect()
-}
-
 pub async fn create_note(
     State(state): State<AppState>,
     Json(body): Json<CreateNote>,
@@ -138,7 +83,6 @@ pub async fn create_note(
         content,
         source_type: source,
         source_url,
-        tags,
     } = body;
     let id = flatten_interact(
         state
@@ -152,8 +96,6 @@ pub async fn create_note(
             .await,
     )?;
 
-    add_tags_to_note(&state.pool, id, tags).await?;
-
     let note = flatten_interact(
         state
             .pool
@@ -164,7 +106,7 @@ pub async fn create_note(
             .await,
     )?;
 
-    // Enqueue for background processing (embed + auto-tag)
+    // Enqueue for background processing (embedding + title/summary organization)
     if let Err(e) = state.background.enqueue(id).await {
         // Log but don't fail the request - note is captured
         tracing::warn!(note_id = id, error = ?e, "Failed to enqueue note for processing");
@@ -210,15 +152,7 @@ pub async fn create_notes_batch(
                         &note.source_type,
                         note.source_url.as_deref(),
                     ) {
-                        Ok(id) => {
-                            // Add tags within the same transaction
-                            for tag_name in &note.tags {
-                                if let Ok(tag_id) = queries::upsert_tag(&tx, tag_name) {
-                                    let _ = queries::add_note_tag(&tx, id, tag_id, 1.0, "manual");
-                                }
-                            }
-                            note_ids.push(id);
-                        }
+                        Ok(id) => note_ids.push(id),
                         Err(e) => {
                             tracing::warn!(error = ?e, "Failed to insert note in batch");
                             failed += 1;
@@ -254,25 +188,21 @@ pub async fn get_notes(
 ) -> Result<Json<NotesResponse>, AppError> {
     let limit = params.limit;
     let offset = params.offset;
-    let exclude_tag = params.exclude_tag.clone();
+    let hide_imported_items = params.hide_imported;
 
     if let Some(ref q) = params.q {
         if q.trim().is_empty() {
-            let mut notes = flatten_interact(
+            let notes = flatten_interact(
                 state
                     .pool
                     .get()
                     .await
                     .map_err(anyhow::Error::from)?
-                    .interact(move |conn| queries::list_notes(conn, limit, offset))
+                    .interact(move |conn| {
+                        queries::list_notes_filtered(conn, limit, offset, hide_imported_items)
+                    })
                     .await,
             )?;
-            notes = populate_tags(&state.pool, notes).await?;
-
-            // Apply tag filter if specified
-            if let Some(ref tag) = exclude_tag {
-                notes = filter_notes_by_excluded_tag(notes, tag);
-            }
 
             let count = notes.len() as i64;
             return Ok(Json(NotesResponse {
@@ -284,13 +214,7 @@ pub async fn get_notes(
             }));
         }
         // Hybrid search: combine FTS and vector similarity
-        let mut notes = hybrid_search(&state, q, limit).await?;
-        notes = populate_tags(&state.pool, notes).await?;
-
-        // Apply tag filter if specified
-        if let Some(ref tag) = exclude_tag {
-            notes = filter_notes_by_excluded_tag(notes, tag);
-        }
+        let notes = hybrid_search(&state, q, limit, offset, hide_imported_items).await?;
 
         let count = notes.len() as i64;
         Ok(Json(NotesResponse {
@@ -301,21 +225,17 @@ pub async fn get_notes(
             offset,
         }))
     } else {
-        let mut notes = flatten_interact(
+        let notes = flatten_interact(
             state
                 .pool
                 .get()
                 .await
                 .map_err(anyhow::Error::from)?
-                .interact(move |conn| queries::list_notes(conn, limit, offset))
+                .interact(move |conn| {
+                    queries::list_notes_filtered(conn, limit, offset, hide_imported_items)
+                })
                 .await,
         )?;
-        notes = populate_tags(&state.pool, notes).await?;
-
-        // Apply tag filter if specified
-        if let Some(ref tag) = exclude_tag {
-            notes = filter_notes_by_excluded_tag(notes, tag);
-        }
 
         let total = flatten_interact(
             state
@@ -323,7 +243,7 @@ pub async fn get_notes(
                 .get()
                 .await
                 .map_err(anyhow::Error::from)?
-                .interact(|conn| queries::count_notes(conn))
+                .interact(move |conn| queries::count_notes_filtered(conn, hide_imported_items))
                 .await,
         )?;
         Ok(Json(NotesResponse {
@@ -382,7 +302,7 @@ pub async fn update_note(
             .await,
     )?;
 
-    // Re-enqueue for background processing (re-embed + re-tag with new content)
+    // Re-enqueue for background processing after derived state is invalidated.
     if let Err(e) = state.background.enqueue(id).await {
         tracing::warn!(note_id = id, error = ?e, "Failed to enqueue updated note for processing");
     }
@@ -412,9 +332,30 @@ async fn hybrid_search(
     state: &AppState,
     query_text: &str,
     limit: i64,
+    offset: i64,
+    hide_imported_items: bool,
 ) -> Result<Vec<queries::Note>, AppError> {
     use std::collections::HashSet;
     use tracing::warn;
+
+    let candidate_limit = if hide_imported_items {
+        flatten_interact(
+            state
+                .pool
+                .get()
+                .await
+                .map_err(anyhow::Error::from)?
+                .interact(|conn| queries::count_notes(conn))
+                .await,
+        )?
+    } else {
+        limit.saturating_add(offset)
+    }
+    .max(0);
+
+    if candidate_limit == 0 {
+        return Ok(Vec::new());
+    }
 
     // 1. Run FTS search (graceful fallback if query causes FTS error)
     let query_clone = query_text.to_string();
@@ -424,7 +365,14 @@ async fn hybrid_search(
             .get()
             .await
             .map_err(anyhow::Error::from)?
-            .interact(move |conn| queries::search_fts(conn, &query_clone, limit))
+            .interact(move |conn| {
+                queries::search_fts_filtered(
+                    conn,
+                    &query_clone,
+                    candidate_limit,
+                    hide_imported_items,
+                )
+            })
             .await,
     ) {
         Ok(fts_notes) => fts_notes.iter().map(|n| n.id).collect(),
@@ -445,7 +393,9 @@ async fn hybrid_search(
                         .get()
                         .await
                         .map_err(anyhow::Error::from)?
-                        .interact(move |conn| queries::search_similar(conn, &embedding, limit))
+                        .interact(move |conn| {
+                            queries::search_similar(conn, &embedding, candidate_limit)
+                        })
                         .await,
                 )?;
 
@@ -466,9 +416,6 @@ async fn hybrid_search(
     merged_ids.sort_unstable();
     merged_ids.reverse(); // Most recent first
 
-    // Limit to requested count
-    merged_ids.truncate(limit as usize);
-
     // 4. Get full Note objects for merged IDs
     if merged_ids.is_empty() {
         return Ok(vec![]);
@@ -484,7 +431,14 @@ async fn hybrid_search(
             .await,
     )?;
 
-    Ok(notes)
+    Ok(notes
+        .into_iter()
+        .filter(|note| {
+            !hide_imported_items || !matches!(note.source_type.as_str(), "bookmark" | "homebrew")
+        })
+        .skip(offset.max(0) as usize)
+        .take(limit.max(0) as usize)
+        .collect())
 }
 
 /// Random notes endpoint for rediscovery widget
@@ -493,18 +447,17 @@ pub async fn random_notes(
     Query(params): Query<NotesQuery>,
 ) -> Result<Json<NotesResponse>, AppError> {
     let limit = params.limit.min(5);
-    let exclude_tag = params.exclude_tag.clone();
+    let hide_imported_items = params.hide_imported;
 
-    let mut notes = flatten_interact(
+    let notes = flatten_interact(
         state
             .pool
             .get()
             .await
             .map_err(anyhow::Error::from)?
-            .interact(move |conn| queries::random_notes(conn, limit, exclude_tag.as_deref()))
+            .interact(move |conn| queries::random_notes(conn, limit, hide_imported_items))
             .await,
     )?;
-    notes = populate_tags(&state.pool, notes).await?;
 
     let count = notes.len() as i64;
     Ok(Json(NotesResponse {

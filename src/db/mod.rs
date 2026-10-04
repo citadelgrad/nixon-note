@@ -2,7 +2,11 @@ pub mod migrations;
 pub mod queries;
 
 use anyhow::Result;
-use deadpool_sqlite::{Config, Pool, Runtime};
+use deadpool_sqlite::{Config, Hook, HookError, Pool, Runtime};
+
+const CONNECTION_PRAGMAS: &str = "PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+PRAGMA busy_timeout = 5000;";
 
 pub fn create_pool(db_path: &str) -> Result<Pool> {
     // Register sqlite-vec auto extension before creating any connections
@@ -19,16 +23,22 @@ pub fn create_pool(db_path: &str) -> Result<Pool> {
     }
 
     let cfg = Config::new(db_path);
-    let pool = cfg.builder(Runtime::Tokio1)?.build()?;
+    let pool = cfg
+        .builder(Runtime::Tokio1)?
+        .post_create(Hook::async_fn(|conn, _| {
+            Box::pin(async move {
+                conn.interact(|conn| conn.execute_batch(CONNECTION_PRAGMAS))
+                    .await
+                    .map_err(|e| HookError::message(format!("failed to configure SQLite: {e}")))?
+                    .map_err(HookError::Backend)
+            })
+        }))
+        .build()?;
     Ok(pool)
 }
 
 pub fn setup_connection(conn: &rusqlite::Connection) -> Result<()> {
-    conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA foreign_keys = ON;
-         PRAGMA busy_timeout = 5000;",
-    )?;
+    conn.execute_batch(CONNECTION_PRAGMAS)?;
     Ok(())
 }
 

@@ -34,6 +34,34 @@ fn default_content_mode() -> String {
     "full".to_string()
 }
 
+fn parse_byte_range(value: &str, file_size: u64) -> Result<(u64, u64), ()> {
+    let range = value.strip_prefix("bytes=").ok_or(())?;
+    if range.contains(',') || file_size == 0 {
+        return Err(());
+    }
+    let (start, end) = range.split_once('-').ok_or(())?;
+    if start.is_empty() {
+        let suffix = end.parse::<u64>().map_err(|_| ())?;
+        if suffix == 0 {
+            return Err(());
+        }
+        return Ok((file_size.saturating_sub(suffix), file_size - 1));
+    }
+    let start = start.parse::<u64>().map_err(|_| ())?;
+    if start >= file_size {
+        return Err(());
+    }
+    let end = if end.is_empty() {
+        file_size - 1
+    } else {
+        end.parse::<u64>().map_err(|_| ())?.min(file_size - 1)
+    };
+    if end < start {
+        return Err(());
+    }
+    Ok((start, end))
+}
+
 #[derive(Serialize)]
 pub struct GenerateAudioResponse {
     pub episode_id: i64,
@@ -334,26 +362,35 @@ pub async fn serve_audio_file(
     let file_size = metadata.len();
 
     // Parse Range header for seeking support
-    let range = req_headers
-        .get(header::RANGE)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.strip_prefix("bytes="))
-        .and_then(|s| {
-            let mut parts = s.splitn(2, '-');
-            let start: u64 = parts.next()?.parse().ok()?;
-            let end: u64 = parts
-                .next()
-                .and_then(|e| if e.is_empty() { None } else { e.parse().ok() })
-                .unwrap_or(file_size - 1);
-            Some((start, end))
-        });
+    let range = match req_headers.get(header::RANGE) {
+        None => None,
+        Some(value) => {
+            let parsed = value
+                .to_str()
+                .map_err(|_| ())
+                .and_then(|value| parse_byte_range(value, file_size));
+            match parsed {
+                Ok(range) => Some(range),
+                Err(()) => {
+                    let mut headers = HeaderMap::new();
+                    headers.insert(
+                        header::CONTENT_RANGE,
+                        format!("bytes */{file_size}").parse().unwrap(),
+                    );
+                    return Ok(
+                        (StatusCode::RANGE_NOT_SATISFIABLE, headers, Body::empty()).into_response()
+                    );
+                }
+            }
+        }
+    };
 
     let mut headers = axum::http::HeaderMap::new();
     headers.insert(header::CONTENT_TYPE, "audio/mpeg".parse().unwrap());
     headers.insert(header::ACCEPT_RANGES, "bytes".parse().unwrap());
     headers.insert(
         header::CACHE_CONTROL,
-        "public, max-age=86400".parse().unwrap(),
+        "private, max-age=86400".parse().unwrap(),
     );
 
     if let Some((start, end)) = range {
@@ -515,7 +552,6 @@ mod tests {
             summary: None,
             created_at: "2026-01-01 00:00:00".to_string(),
             updated_at: "2026-01-01 00:00:00".to_string(),
-            tags: vec![],
         }
     }
 
@@ -575,5 +611,19 @@ mod tests {
             queries::clean_audio_episode_title("  Custom Episode  "),
             Some("Custom Episode".to_string())
         );
+    }
+
+    #[test]
+    fn byte_ranges_are_bounded_and_nonempty() {
+        assert_eq!(parse_byte_range("bytes=0-4", 10), Ok((0, 4)));
+        assert_eq!(parse_byte_range("bytes=5-", 10), Ok((5, 9)));
+        assert_eq!(parse_byte_range("bytes=5-99", 10), Ok((5, 9)));
+        assert_eq!(parse_byte_range("bytes=10-", 10), Err(()));
+        assert_eq!(parse_byte_range("bytes=8-2", 10), Err(()));
+        assert_eq!(parse_byte_range("bytes=0-", 0), Err(()));
+        assert_eq!(parse_byte_range("bytes=-5", 10), Ok((5, 9)));
+        assert_eq!(parse_byte_range("bytes=-50", 10), Ok((0, 9)));
+        assert_eq!(parse_byte_range("bytes=-0", 10), Err(()));
+        assert_eq!(parse_byte_range("bytes=0-1,3-4", 10), Err(()));
     }
 }

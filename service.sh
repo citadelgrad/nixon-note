@@ -23,7 +23,7 @@ case "$COMMAND" in
     fi
     PORT="${APP_PORT:-9999}"
     curl --max-time 5 -fsS "http://127.0.0.1:$PORT/" >/dev/null
-    curl --max-time 5 -fsS "http://127.0.0.1:$PORT/api/status" >/dev/null
+    curl --max-time 5 -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null
     echo "NixonNote web app and API are responding on port $PORT."
     ;;
   logs)

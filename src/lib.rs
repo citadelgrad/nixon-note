@@ -39,16 +39,19 @@ async fn auth_middleware(req: Request, next: Next) -> Result<Response, StatusCod
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
 
-    match auth_header.and_then(|val| val.strip_prefix("Bearer ")) {
-        Some(bearer_token) if bool::from(bearer_token.as_bytes().ct_eq(token.as_bytes())) => {
-            Ok(next.run(req).await)
-        }
-        _ => Err(StatusCode::UNAUTHORIZED),
+    let bearer_matches = auth_header
+        .and_then(|val| val.strip_prefix("Bearer "))
+        .is_some_and(|bearer_token| bool::from(bearer_token.as_bytes().ct_eq(token.as_bytes())));
+    if bearer_matches {
+        Ok(next.run(req).await)
+    } else {
+        Err(StatusCode::UNAUTHORIZED)
     }
 }
 
 pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
+        .route("/status", get(routes::status::get_status))
         .route(
             "/notes",
             get(routes::notes::get_notes).post(routes::notes::create_note),
@@ -60,8 +63,6 @@ pub fn create_router(state: AppState) -> Router {
                 .put(routes::notes::update_note)
                 .delete(routes::notes::delete_note),
         )
-        .route("/tags", get(routes::tags::list_tags))
-        .route("/tags/filter", get(routes::tags::notes_by_tag))
         .route(
             "/voice",
             post(routes::voice::transcribe_voice).layer(DefaultBodyLimit::max(50 * 1024 * 1024)),
@@ -94,7 +95,7 @@ pub fn create_router(state: AppState) -> Router {
     let serve_dir = ServeDir::new(&web_dir).not_found_service(ServeFile::new(&index_file));
 
     Router::new()
-        .route("/api/status", get(routes::status::get_status))
+        .route("/api/health", get(routes::status::get_health))
         .nest("/api", api_routes)
         .fallback_service(serve_dir)
         .layer(CompressionLayer::new())

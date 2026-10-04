@@ -6,6 +6,10 @@ use std::time::Duration;
 
 use crate::AppState;
 
+pub async fn get_health() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "status": "ok" }))
+}
+
 #[derive(Serialize)]
 pub struct StatusResponse {
     pub services: Services,

@@ -38,8 +38,7 @@ async fn test_bookmarks_import_success() {
             {
                 "title": "Rust Programming Language",
                 "url": "https://www.rust-lang.org",
-                "notes": "Official Rust website",
-                "tags": ["programming", "rust"]
+                "notes": "Official Rust website"
             },
             {
                 "title": "GitHub",

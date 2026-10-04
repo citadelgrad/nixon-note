@@ -22,7 +22,7 @@
   /* Muted error — informs, doesn't punish */
   --color-muted-red: #c27a6b;
 
-  /* Warm color palette for tag chips (ADHD-friendly, no blue) */
+  /* Warm accent palette (ADHD-friendly, no blue) */
   --color-amber-100: #fef3c7;
   --color-amber-200: #fde68a;
   --color-amber-700: #b45309;
@@ -67,7 +67,8 @@
 }
 
 /* Default theme: Sage (existing colors) */
-:root, [data-theme="sage"] {
+:root,
+[data-theme="sage"] {
   --theme-bg: #fefdfb;
   --theme-bg-secondary: #f6f7f4;
   --theme-surface: #ffffff;
@@ -130,7 +131,9 @@ body {
   @apply bg-cream-50 text-sage-900 antialiased;
   line-height: 1.6;
   margin: 0;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* Custom prose styles for markdown - comprehensive styling */
@@ -286,7 +289,7 @@ body {
   border-radius: 0.3em;
   font-size: 0.875em;
   color: var(--color-sage-700);
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace;
   font-weight: 400;
   border: 1px solid var(--color-sage-100);
 }

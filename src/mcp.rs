@@ -34,9 +34,6 @@ pub struct CaptureRequest {
     /// Source type (default: "mcp")
     #[serde(default = "default_source")]
     pub source_type: String,
-    /// Tags to apply
-    #[serde(default)]
-    pub tags: Vec<String>,
 }
 
 fn default_source() -> String {
@@ -73,8 +70,8 @@ impl NoteMcpServer {
                             serde_json::json!({
                                 "id": n.id,
                                 "title": n.title,
-                                "content": if n.content.len() > 500 {
-                                    format!("{}...", &n.content[..500])
+                                "content": if n.content.chars().count() > 500 {
+                                    format!("{}...", n.content.chars().take(500).collect::<String>())
                                 } else {
                                     n.content.clone()
                                 },
@@ -97,14 +94,7 @@ impl NoteMcpServer {
             Ok(conn) => {
                 match db::queries::insert_note(&conn, &req.content, "text", &req.source_type, None)
                 {
-                    Ok(id) => {
-                        for tag_name in &req.tags {
-                            if let Ok(tag_id) = db::queries::upsert_tag(&conn, tag_name) {
-                                let _ = db::queries::add_note_tag(&conn, id, tag_id, 1.0, "manual");
-                            }
-                        }
-                        format!("Note #{} created successfully", id)
-                    }
+                    Ok(id) => format!("Note #{} created successfully", id),
                     Err(e) => format!("Failed to create note: {}", e),
                 }
             }
@@ -112,16 +102,11 @@ impl NoteMcpServer {
         }
     }
 
-    #[tool(description = "Get a specific note by ID with full content and tags")]
+    #[tool(description = "Get a specific note by ID with full content")]
     fn get_note(&self, Parameters(req): Parameters<GetNoteRequest>) -> String {
         match self.open_db() {
             Ok(conn) => match db::queries::get_note(&conn, req.id) {
                 Ok(note) => {
-                    let tags = db::queries::get_note_tags(&conn, note.id)
-                        .unwrap_or_default()
-                        .iter()
-                        .map(|t| t.tag_name.clone())
-                        .collect::<Vec<_>>();
                     let result = serde_json::json!({
                         "id": note.id,
                         "content": note.content,
@@ -129,7 +114,6 @@ impl NoteMcpServer {
                         "summary": note.summary,
                         "source_type": note.source_type,
                         "source_url": note.source_url,
-                        "tags": tags,
                         "created_at": note.created_at,
                         "updated_at": note.updated_at,
                     });

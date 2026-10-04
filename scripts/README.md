@@ -112,9 +112,9 @@ my-notes/
 - ✅ Success/failure tracking
 - ✅ Handles special characters
 - ✅ Supports `.txt` and `.md` files
-- ✅ Background AI processing (embeddings, auto-tagging)
+- ✅ Background AI processing (embeddings, titles, and summaries)
 
 After import, notes will be processed in the background to:
 - Generate embeddings (for semantic search)
-- Auto-tag (if Claude API is configured)
+- Generate a title and summary (if Claude API is configured)
 - Build full-text search index

@@ -305,9 +305,9 @@ async fn synthesize_answer_gemini(
 }
 
 fn preview_content(content: &str, max_len: usize) -> String {
-    if content.len() <= max_len {
+    if content.chars().count() <= max_len {
         content.to_string()
     } else {
-        format!("{}...", &content[..max_len])
+        format!("{}...", content.chars().take(max_len).collect::<String>())
     }
 }

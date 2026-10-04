@@ -13,8 +13,6 @@ pub struct Note {
     pub summary: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    #[serde(default)]
-    pub tags: Vec<String>,
 }
 
 fn row_to_note(row: &rusqlite::Row) -> rusqlite::Result<Note> {
@@ -28,7 +26,6 @@ fn row_to_note(row: &rusqlite::Row) -> rusqlite::Result<Note> {
         summary: row.get("summary")?,
         created_at: row.get("created_at")?,
         updated_at: row.get("updated_at")?,
-        tags: vec![], // Will be populated separately
     })
 }
 
@@ -63,31 +60,36 @@ pub fn get_note(conn: &Connection, id: i64) -> Result<Note> {
 }
 
 pub fn update_note(conn: &Connection, id: i64, content: &str) -> Result<()> {
-    conn.execute(
-        "UPDATE notes SET content = ?1, updated_at = datetime('now') WHERE id = ?2",
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "UPDATE notes
+         SET content = ?1, title = NULL, summary = NULL, updated_at = datetime('now')
+         WHERE id = ?2",
         params![content, id],
     )?;
+    tx.execute(
+        "DELETE FROM note_embeddings WHERE note_id = ?1",
+        params![id],
+    )?;
+    tx.commit()?;
     Ok(())
 }
 
 pub fn delete_note(conn: &Connection, id: i64) -> Result<()> {
     // Delete in order to respect foreign key constraints
-    // 1. Delete tags
-    conn.execute("DELETE FROM note_tags WHERE note_id = ?1", params![id])?;
-
-    // 2. Delete embeddings
+    // 1. Delete embeddings
     conn.execute(
         "DELETE FROM note_embeddings WHERE note_id = ?1",
         params![id],
     )?;
 
-    // 3. Delete links (both as source and target)
+    // 2. Delete links (both as source and target)
     conn.execute(
         "DELETE FROM note_links WHERE source_note_id = ?1 OR target_note_id = ?1",
         params![id],
     )?;
 
-    // 4. Delete the note itself (FTS trigger will handle notes_fts cleanup)
+    // 3. Delete the note itself (FTS trigger will handle notes_fts cleanup)
     conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
 
     Ok(())
@@ -120,15 +122,39 @@ pub fn get_notes_by_ids(conn: &Connection, ids: &[i64]) -> Result<Vec<Note>> {
 }
 
 pub fn list_notes(conn: &Connection, limit: i64, offset: i64) -> Result<Vec<Note>> {
-    let mut stmt = conn.prepare(
+    list_notes_filtered(conn, limit, offset, false)
+}
+
+pub fn list_notes_filtered(
+    conn: &Connection,
+    limit: i64,
+    offset: i64,
+    hide_imported: bool,
+) -> Result<Vec<Note>> {
+    let sql = if hide_imported {
         "SELECT id, content, content_type, source_type, source_url, title, summary, created_at, updated_at
-         FROM notes ORDER BY id DESC LIMIT ?1 OFFSET ?2",
-    )?;
+         FROM notes
+         WHERE source_type NOT IN ('bookmark', 'homebrew')
+         ORDER BY id DESC LIMIT ?1 OFFSET ?2"
+    } else {
+        "SELECT id, content, content_type, source_type, source_url, title, summary, created_at, updated_at
+         FROM notes ORDER BY id DESC LIMIT ?1 OFFSET ?2"
+    };
+    let mut stmt = conn.prepare(sql)?;
     let notes = stmt.query_map(params![limit, offset], row_to_note)?;
     notes.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
 pub fn search_fts(conn: &Connection, query: &str, limit: i64) -> Result<Vec<Note>> {
+    search_fts_filtered(conn, query, limit, false)
+}
+
+pub fn search_fts_filtered(
+    conn: &Connection,
+    query: &str,
+    limit: i64,
+    hide_imported: bool,
+) -> Result<Vec<Note>> {
     // Sanitize query for FTS5: wrap each token in double quotes to escape
     // special characters like hyphens, asterisks, etc. that FTS5 interprets
     // as operators (e.g. "claude-m" would be parsed as "claude NOT m").
@@ -142,52 +168,56 @@ pub fn search_fts(conn: &Connection, query: &str, limit: i64) -> Result<Vec<Note
         return Ok(vec![]);
     }
 
-    let mut stmt = conn.prepare(
+    let sql = if hide_imported {
         "SELECT n.id, n.content, n.content_type, n.source_type, n.source_url, n.title, n.summary, n.created_at, n.updated_at
-         FROM notes n
-         JOIN notes_fts ON notes_fts.rowid = n.id
-         WHERE notes_fts MATCH ?1
-         ORDER BY rank
-         LIMIT ?2",
-    )?;
+         FROM notes n JOIN notes_fts ON notes_fts.rowid = n.id
+         WHERE notes_fts MATCH ?1 AND n.source_type NOT IN ('bookmark', 'homebrew')
+         ORDER BY rank LIMIT ?2"
+    } else {
+        "SELECT n.id, n.content, n.content_type, n.source_type, n.source_url, n.title, n.summary, n.created_at, n.updated_at
+         FROM notes n JOIN notes_fts ON notes_fts.rowid = n.id
+         WHERE notes_fts MATCH ?1 ORDER BY rank LIMIT ?2"
+    };
+    let mut stmt = conn.prepare(sql)?;
     let notes = stmt.query_map(params![sanitized, limit], row_to_note)?;
     notes.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
 pub fn count_notes(conn: &Connection) -> Result<i64> {
+    count_notes_filtered(conn, false)
+}
+
+pub fn count_notes_filtered(conn: &Connection, hide_imported: bool) -> Result<i64> {
+    if hide_imported {
+        return Ok(conn.query_row(
+            "SELECT COUNT(*) FROM notes WHERE source_type NOT IN ('bookmark', 'homebrew')",
+            [],
+            |r| r.get(0),
+        )?);
+    }
     Ok(conn.query_row("SELECT COUNT(*) FROM notes", [], |r| r.get(0))?)
 }
 
-/// Export all notes (no limit/offset) with tags populated, for data export.
+/// Export all notes (no limit/offset) for data export.
 pub fn export_all_notes(conn: &Connection) -> Result<Vec<Note>> {
     let mut stmt = conn.prepare(
         "SELECT id, content, content_type, source_type, source_url, title, summary, created_at, updated_at
          FROM notes ORDER BY id ASC",
     )?;
     let notes = stmt.query_map([], row_to_note)?;
-    let notes: Vec<Note> = notes.collect::<std::result::Result<Vec<_>, _>>()?;
-    populate_note_tags(conn, notes)
+    notes.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
 /// Get random notes for rediscovery — surfaces forgotten content.
-/// When exclude_tag is provided, also excludes bulk-imported source types
-/// (bookmark, homebrew) to catch items that may not have been tagged.
-pub fn random_notes(conn: &Connection, limit: i64, exclude_tag: Option<&str>) -> Result<Vec<Note>> {
-    let (query, params_vec): (String, Vec<Box<dyn rusqlite::ToSql>>) = if let Some(tag) =
-        exclude_tag
-    {
+pub fn random_notes(conn: &Connection, limit: i64, hide_imported: bool) -> Result<Vec<Note>> {
+    let (query, params_vec): (String, Vec<Box<dyn rusqlite::ToSql>>) = if hide_imported {
         (
-            "SELECT n.id, n.content, n.content_type, n.source_type, n.source_url, n.title, n.summary, n.created_at, n.updated_at
-             FROM notes n
-             WHERE n.id NOT IN (
-                SELECT nt.note_id FROM note_tags nt
-                JOIN tags t ON t.id = nt.tag_id
-                WHERE t.name = ?1
-             )
-             AND n.source_type NOT IN ('bookmark', 'homebrew')
-             ORDER BY RANDOM() LIMIT ?2"
+            "SELECT id, content, content_type, source_type, source_url, title, summary, created_at, updated_at
+             FROM notes
+             WHERE source_type NOT IN ('bookmark', 'homebrew')
+             ORDER BY RANDOM() LIMIT ?1"
                 .to_string(),
-            vec![Box::new(tag.to_string()) as Box<dyn rusqlite::ToSql>, Box::new(limit)],
+            vec![Box::new(limit) as Box<dyn rusqlite::ToSql>],
         )
     } else {
         (
@@ -201,154 +231,6 @@ pub fn random_notes(conn: &Connection, limit: i64, exclude_tag: Option<&str>) ->
     let mut stmt = conn.prepare(&query)?;
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
     let notes = stmt.query_map(&params_refs[..], row_to_note)?;
-    notes.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-}
-
-// --- M2: Tags ---
-
-#[derive(Debug, Serialize, Clone)]
-#[allow(dead_code)]
-pub struct Tag {
-    pub id: i64,
-    pub name: String,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct TagWithCount {
-    pub id: i64,
-    pub name: String,
-    pub count: i64,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct NoteTag {
-    pub note_id: i64,
-    pub tag_id: i64,
-    pub tag_name: String,
-    pub confidence: f64,
-    pub source: String,
-}
-
-pub fn upsert_tag(conn: &Connection, name: &str) -> Result<i64> {
-    conn.execute(
-        "INSERT INTO tags (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
-        params![name],
-    )?;
-    Ok(
-        conn.query_row("SELECT id FROM tags WHERE name = ?1", params![name], |r| {
-            r.get(0)
-        })?,
-    )
-}
-
-pub fn add_note_tag(
-    conn: &Connection,
-    note_id: i64,
-    tag_id: i64,
-    confidence: f64,
-    source: &str,
-) -> Result<()> {
-    conn.execute(
-        "INSERT INTO note_tags (note_id, tag_id, confidence, source) VALUES (?1, ?2, ?3, ?4)
-         ON CONFLICT(note_id, tag_id) DO UPDATE SET confidence = ?3, source = ?4",
-        params![note_id, tag_id, confidence, source],
-    )?;
-    Ok(())
-}
-
-pub fn get_note_tags(conn: &Connection, note_id: i64) -> Result<Vec<NoteTag>> {
-    let mut stmt = conn.prepare(
-        "SELECT nt.note_id, nt.tag_id, t.name, nt.confidence, nt.source
-         FROM note_tags nt
-         JOIN tags t ON t.id = nt.tag_id
-         WHERE nt.note_id = ?1",
-    )?;
-    let tags = stmt.query_map(params![note_id], |row| {
-        Ok(NoteTag {
-            note_id: row.get(0)?,
-            tag_id: row.get(1)?,
-            tag_name: row.get(2)?,
-            confidence: row.get(3)?,
-            source: row.get(4)?,
-        })
-    })?;
-    tags.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-}
-
-/// Populate tags for a list of notes
-pub fn populate_note_tags(conn: &Connection, mut notes: Vec<Note>) -> Result<Vec<Note>> {
-    if notes.is_empty() {
-        return Ok(notes);
-    }
-
-    // Build IN clause for all note IDs
-    let note_ids: Vec<i64> = notes.iter().map(|n| n.id).collect();
-    let placeholders = note_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let query = format!(
-        "SELECT nt.note_id, t.name
-         FROM note_tags nt
-         JOIN tags t ON t.id = nt.tag_id
-         WHERE nt.note_id IN ({})
-         ORDER BY nt.note_id, t.name",
-        placeholders
-    );
-
-    let mut stmt = conn.prepare(&query)?;
-    let params: Vec<&dyn rusqlite::ToSql> = note_ids
-        .iter()
-        .map(|id| id as &dyn rusqlite::ToSql)
-        .collect();
-    let tag_rows = stmt.query_map(&params[..], |row| {
-        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-    })?;
-
-    // Group tags by note_id
-    let mut tags_by_note: std::collections::HashMap<i64, Vec<String>> =
-        std::collections::HashMap::new();
-    for row in tag_rows {
-        let (note_id, tag_name) = row?;
-        tags_by_note.entry(note_id).or_default().push(tag_name);
-    }
-
-    // Populate tags field for each note
-    for note in &mut notes {
-        if let Some(tags) = tags_by_note.get(&note.id) {
-            note.tags = tags.clone();
-        }
-    }
-
-    Ok(notes)
-}
-
-pub fn list_tags(conn: &Connection) -> Result<Vec<TagWithCount>> {
-    let mut stmt = conn.prepare(
-        "SELECT t.id, t.name, COUNT(nt.note_id) as count
-         FROM tags t
-         LEFT JOIN note_tags nt ON nt.tag_id = t.id
-         GROUP BY t.id, t.name
-         ORDER BY count DESC, t.name ASC",
-    )?;
-    let tags = stmt.query_map([], |row| {
-        Ok(TagWithCount {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            count: row.get(2)?,
-        })
-    })?;
-    tags.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-}
-
-pub fn notes_by_tag(conn: &Connection, tag_name: &str, limit: i64) -> Result<Vec<Note>> {
-    let mut stmt = conn.prepare(
-        "SELECT n.id, n.content, n.content_type, n.source_type, n.source_url, n.title, n.summary, n.created_at, n.updated_at
-         FROM notes n
-         JOIN note_tags nt ON nt.note_id = n.id
-         JOIN tags t ON t.id = nt.tag_id
-         WHERE t.name = ?1
-         ORDER BY n.id DESC
-         LIMIT ?2",
-    )?;
-    let notes = stmt.query_map(params![tag_name, limit], row_to_note)?;
     notes.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
@@ -370,6 +252,26 @@ pub fn insert_embedding(conn: &Connection, note_id: i64, embedding: &[f32]) -> R
         params![note_id, embedding_bytes],
     )?;
     Ok(())
+}
+
+pub fn insert_embedding_if_content_matches(
+    conn: &Connection,
+    note_id: i64,
+    expected_content: &str,
+    embedding: &[f32],
+) -> Result<bool> {
+    let tx = conn.unchecked_transaction()?;
+    let current_content: String = tx.query_row(
+        "SELECT content FROM notes WHERE id = ?1",
+        params![note_id],
+        |row| row.get(0),
+    )?;
+    if current_content != expected_content {
+        return Ok(false);
+    }
+    insert_embedding(&tx, note_id, embedding)?;
+    tx.commit()?;
+    Ok(true)
 }
 
 pub fn search_similar(
@@ -909,6 +811,17 @@ mod tests {
     }
 
     #[test]
+    fn filtered_search_applies_source_filter_before_limit() {
+        let conn = setup();
+        insert_note(&conn, "shared term", "text", "web", None).unwrap();
+        insert_note(&conn, "shared term", "text", "homebrew", None).unwrap();
+
+        let results = search_fts_filtered(&conn, "shared", 1, true).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].source_type, "web");
+    }
+
+    #[test]
     fn list_notes_ordered() {
         let conn = setup();
         insert_note(&conn, "first note", "text", "cli", None).unwrap();
@@ -968,66 +881,6 @@ mod tests {
         let conn = setup();
         let results = search_fts(&conn, "anything", 10).unwrap();
         assert_eq!(results.len(), 0);
-    }
-
-    // --- M2 Tests ---
-
-    #[test]
-    fn upsert_tag_creates_and_reuses() {
-        let conn = setup();
-        let id1 = upsert_tag(&conn, "rust").unwrap();
-        let id2 = upsert_tag(&conn, "rust").unwrap();
-        assert_eq!(id1, id2, "Upserting same tag should return same ID");
-    }
-
-    #[test]
-    fn add_and_get_note_tags() {
-        let conn = setup();
-        let note_id = insert_note(&conn, "learning rust", "text", "cli", None).unwrap();
-        let tag_id = upsert_tag(&conn, "rust").unwrap();
-        add_note_tag(&conn, note_id, tag_id, 0.9, "ai").unwrap();
-
-        let tags = get_note_tags(&conn, note_id).unwrap();
-        assert_eq!(tags.len(), 1);
-        assert_eq!(tags[0].tag_name, "rust");
-        assert_eq!(tags[0].confidence, 0.9);
-        assert_eq!(tags[0].source, "ai");
-    }
-
-    #[test]
-    fn list_tags_with_counts() {
-        let conn = setup();
-        let n1 = insert_note(&conn, "rust note", "text", "cli", None).unwrap();
-        let n2 = insert_note(&conn, "also rust", "text", "cli", None).unwrap();
-        let tag_rust = upsert_tag(&conn, "rust").unwrap();
-        let _tag_empty = upsert_tag(&conn, "unused").unwrap();
-
-        add_note_tag(&conn, n1, tag_rust, 1.0, "ai").unwrap();
-        add_note_tag(&conn, n2, tag_rust, 1.0, "ai").unwrap();
-
-        let tags = list_tags(&conn).unwrap();
-        assert_eq!(tags.len(), 2);
-        // rust should have count 2, unused should have count 0
-        let rust_tag = tags.iter().find(|t| t.name == "rust").unwrap();
-        assert_eq!(rust_tag.count, 2);
-        let unused_tag = tags.iter().find(|t| t.name == "unused").unwrap();
-        assert_eq!(unused_tag.count, 0);
-    }
-
-    #[test]
-    fn notes_by_tag_filters_correctly() {
-        let conn = setup();
-        let n1 = insert_note(&conn, "rust note", "text", "cli", None).unwrap();
-        let n2 = insert_note(&conn, "python note", "text", "cli", None).unwrap();
-        let tag_rust = upsert_tag(&conn, "rust").unwrap();
-        let tag_python = upsert_tag(&conn, "python").unwrap();
-
-        add_note_tag(&conn, n1, tag_rust, 1.0, "ai").unwrap();
-        add_note_tag(&conn, n2, tag_python, 1.0, "ai").unwrap();
-
-        let rust_notes = notes_by_tag(&conn, "rust", 10).unwrap();
-        assert_eq!(rust_notes.len(), 1);
-        assert_eq!(rust_notes[0].id, n1);
     }
 
     #[test]
@@ -1230,26 +1083,6 @@ mod tests {
     }
 
     #[test]
-    fn delete_note_cleans_up_tags() {
-        let conn = setup();
-        let note_id = insert_note(&conn, "tagged note", "text", "cli", None).unwrap();
-        let tag_id = upsert_tag(&conn, "test-tag").unwrap();
-        add_note_tag(&conn, note_id, tag_id, 1.0, "manual").unwrap();
-        assert_eq!(get_note_tags(&conn, note_id).unwrap().len(), 1);
-
-        delete_note(&conn, note_id).unwrap();
-
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM note_tags WHERE note_id = ?1",
-                params![note_id],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert_eq!(count, 0);
-    }
-
-    #[test]
     fn add_and_get_note_links() {
         let conn = setup();
         let n1 = insert_note(&conn, "source", "text", "cli", None).unwrap();
@@ -1264,5 +1097,39 @@ mod tests {
         assert_eq!(links[0].link_type, "related");
         assert_eq!(links[0].reason, Some("both about rust".to_string()));
         assert_eq!(links[0].strength, 0.8);
+    }
+
+    #[test]
+    fn update_note_invalidates_derived_metadata_and_embedding() {
+        let conn = setup();
+        let note_id = insert_note(&conn, "old content", "text", "cli", None).unwrap();
+        conn.execute(
+            "UPDATE notes SET title = 'Old title', summary = 'Old summary' WHERE id = ?1",
+            params![note_id],
+        )
+        .unwrap();
+        insert_embedding(&conn, note_id, &vec![0.1; 768]).unwrap();
+
+        update_note(&conn, note_id, "new content").unwrap();
+
+        let note = get_note(&conn, note_id).unwrap();
+        assert_eq!(note.content, "new content");
+        assert_eq!(note.title, None);
+        assert_eq!(note.summary, None);
+        assert!(!has_embedding(&conn, note_id).unwrap());
+    }
+
+    #[test]
+    fn stale_embedding_is_not_stored_after_content_changes() {
+        let conn = setup();
+        let note_id = insert_note(&conn, "old content", "text", "cli", None).unwrap();
+
+        update_note(&conn, note_id, "new content").unwrap();
+        let stored =
+            insert_embedding_if_content_matches(&conn, note_id, "old content", &vec![0.1; 768])
+                .unwrap();
+
+        assert!(!stored);
+        assert!(!has_embedding(&conn, note_id).unwrap());
     }
 }

@@ -61,7 +61,7 @@ while IFS= read -r pkg; do
 **Homepage:** $homepage"
     fi
 
-    # Create note object with tags
+    # Create note object
     note=$(jq -n \
         --arg content "$content" \
         --arg source "homebrew" \
@@ -69,8 +69,7 @@ while IFS= read -r pkg; do
         '{
             content: $content,
             source_type: $source,
-            source_url: $url,
-            tags: ["hidden", "tool"]
+            source_url: $url
         }')
 
     notes+=("$note")

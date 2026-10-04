@@ -1,5 +1,5 @@
 use std::env;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 
 use anyhow::{Context, Result, bail};
 use tracing_subscriber::EnvFilter;
@@ -10,19 +10,12 @@ fn db_path() -> String {
     env::var("NOTE_DB").unwrap_or_else(|_| "note.db".to_string())
 }
 
-/// Resolve the address the server binds to.
-///
-/// Defaults to loopback (`127.0.0.1`) so the server is not reachable from
-/// other devices unless `NOTE_HOST` is set explicitly. An invalid `NOTE_HOST`
-/// value is a hard error; it never silently falls back to an all-interfaces
-/// bind such as `0.0.0.0`.
-fn resolve_bind_host(note_host: Option<&str>) -> Result<IpAddr> {
-    match note_host {
-        None => Ok(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-        Some(value) => value
-            .parse()
-            .with_context(|| format!("Invalid NOTE_HOST: {value:?}")),
+fn validated_listen_addr(host: &str, port: u16, token: &str) -> Result<SocketAddr> {
+    let ip: IpAddr = host.parse().context("Invalid NOTE_HOST")?;
+    if !ip.is_loopback() && token.trim().is_empty() {
+        bail!("NOTE_TOKEN is required when NOTE_HOST is not loopback");
     }
+    Ok(SocketAddr::new(ip, port))
 }
 
 // --- CLI mode ---
@@ -110,9 +103,9 @@ async fn run_server() -> Result<()> {
         .parse()
         .context("Invalid NOTE_PORT")?;
 
-    let host = resolve_bind_host(env::var("NOTE_HOST").ok().as_deref())?;
-
-    let addr = SocketAddr::new(host, port);
+    let host = env::var("NOTE_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let token = env::var("NOTE_TOKEN").unwrap_or_default();
+    let addr = validated_listen_addr(&host, port, &token)?;
     tracing::info!("Server listening on {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -145,31 +138,15 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv6Addr;
-
     use super::*;
 
     #[test]
-    fn resolve_bind_host_defaults_to_loopback() {
-        let host = resolve_bind_host(None).unwrap();
-        assert_eq!(host, IpAddr::V4(Ipv4Addr::LOCALHOST));
-    }
-
-    #[test]
-    fn resolve_bind_host_accepts_all_interfaces_override() {
-        let host = resolve_bind_host(Some("0.0.0.0")).unwrap();
-        assert_eq!(host, IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)));
-    }
-
-    #[test]
-    fn resolve_bind_host_accepts_ipv6_loopback_override() {
-        let host = resolve_bind_host(Some("::1")).unwrap();
-        assert_eq!(host, IpAddr::V6(Ipv6Addr::LOCALHOST));
-    }
-
-    #[test]
-    fn resolve_bind_host_rejects_invalid_value() {
-        let err = resolve_bind_host(Some("not-an-ip")).unwrap_err();
-        assert!(err.to_string().contains("NOTE_HOST"));
+    fn non_loopback_bind_requires_authentication() {
+        assert!(validated_listen_addr("0.0.0.0", 9999, "").is_err());
+        assert!(validated_listen_addr("192.168.1.10", 9999, "").is_err());
+        assert!(validated_listen_addr("0.0.0.0", 9999, "secret").is_ok());
+        assert!(validated_listen_addr("127.0.0.1", 9999, "").is_ok());
+        assert!(validated_listen_addr("::1", 9999, "").is_ok());
+        assert!(validated_listen_addr("not-an-ip", 9999, "").is_err());
     }
 }

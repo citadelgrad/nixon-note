@@ -1,4 +1,4 @@
-import { isYouTubeUrl, isTwitterUrl, isClippableUrl, getConfig } from './lib/clip.js';
+import { isYouTubeUrl, isClippableUrl, getConfig } from './lib/clip.js';
 
 // ===== Badge Feedback =====
 
@@ -31,9 +31,8 @@ async function clipUrl(url) {
   }
 
   const isYT = isYouTubeUrl(url);
-  const isTweet = isTwitterUrl(url);
   const endpoint = isYT ? '/api/ingest/youtube' : '/api/ingest/url';
-  const body = isYT ? { url } : { url, tags: isTweet ? ['tweet', 'browser-clip'] : ['browser-clip'] };
+  const body = { url };
 
   const headers = { 'Content-Type': 'application/json' };
   if (apiToken) {

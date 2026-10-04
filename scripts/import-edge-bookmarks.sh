@@ -65,7 +65,7 @@ extract_bookmarks() {
 
 **URL:** $url"
 
-        # Output as JSON note object with tags
+        # Output as JSON note object
         jq -n \
             --arg content "$content" \
             --arg source "bookmark" \
@@ -73,8 +73,7 @@ extract_bookmarks() {
             "{
                 content: \$content,
                 source_type: \$source,
-                source_url: \$url,
-                tags: [\"hidden\", \"bookmark\"]
+                source_url: \$url
             }"
     elif [ "$type" = "folder" ]; then
         # Recurse into folder

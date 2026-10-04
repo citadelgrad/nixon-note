@@ -48,7 +48,7 @@ fi
 echo ""
 
 # 3. Check Claude API
-echo "3. Auto-tagging (Claude API)"
+echo "3. Automatic titles and summaries (Claude API)"
 ENV_FILE="$HOME/.config/nixonnote/env"
 if [[ -f "$ENV_FILE" ]] && grep -qE '^(export[[:space:]]+)?ANTHROPIC_API_KEY=' "$ENV_FILE"; then
     log_info "Claude API key is configured"

@@ -1,31 +1,37 @@
-import type { Note } from '../api'
-import { NoteCard } from './NoteCard'
+import type { Note } from "../api";
+import { NoteCard } from "./NoteCard";
 
 interface DailyDigestProps {
-  notes: Note[]
-  onNoteDeleted?: () => void
-  onTagClick?: (tag: string) => void
-  onNoteExpand?: (note: Note) => void
-  onAudioGenerated?: (episodeId: number) => void
+  notes: Note[];
+  onNoteDeleted?: () => void;
+
+  onNoteExpand?: (note: Note) => void;
+  onAudioGenerated?: (episodeId: number) => void;
 }
 
 interface NotesGroupedByDay {
-  date: string
-  dateLabel: string
-  notes: Note[]
+  date: string;
+  dateLabel: string;
+  notes: Note[];
 }
 
-export function DailyDigest({ notes, onNoteDeleted, onTagClick, onNoteExpand, onAudioGenerated }: DailyDigestProps) {
-  const grouped = groupNotesByDay(notes)
+export function DailyDigest({
+  notes,
+  onNoteDeleted,
+  onNoteExpand,
+  onAudioGenerated,
+}: DailyDigestProps) {
+  const grouped = groupNotesByDay(notes);
 
   if (grouped.length === 0) {
     return (
       <div className="rounded-xl bg-sage-50 p-8 text-center">
         <p className="text-sage-400">
-          No notes yet. Capture your first thought using the input below or the voice button.
+          No notes yet. Capture your first thought using the input below or the
+          voice button.
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -44,7 +50,7 @@ export function DailyDigest({ notes, onNoteDeleted, onTagClick, onNoteExpand, on
                 key={note.id}
                 note={note}
                 onDelete={onNoteDeleted}
-                onTagClick={onTagClick}
+
                 onExpand={onNoteExpand}
                 onAudioGenerated={onAudioGenerated}
               />
@@ -53,69 +59,71 @@ export function DailyDigest({ notes, onNoteDeleted, onTagClick, onNoteExpand, on
         </div>
       ))}
     </div>
-  )
+  );
 }
 
 function groupNotesByDay(notes: Note[]): NotesGroupedByDay[] {
-  const groups = new Map<string, Note[]>()
+  const groups = new Map<string, Note[]>();
 
   for (const note of notes) {
-    const date = new Date(note.created_at)
-    const dateKey = formatDateKey(date)
+    const date = new Date(note.created_at);
+    const dateKey = formatDateKey(date);
 
     if (!groups.has(dateKey)) {
-      groups.set(dateKey, [])
+      groups.set(dateKey, []);
     }
-    groups.get(dateKey)!.push(note)
+    groups.get(dateKey)!.push(note);
   }
 
   // Convert to array and sort by date (newest first)
-  const result: NotesGroupedByDay[] = []
+  const result: NotesGroupedByDay[] = [];
 
   for (const [dateKey, notesForDay] of groups) {
-    const date = new Date(dateKey)
+    const date = new Date(dateKey);
     result.push({
       date: dateKey,
       dateLabel: formatDateLabel(date),
       notes: notesForDay,
-    })
+    });
   }
 
-  result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  result.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
 
-  return result
+  return result;
 }
 
 function formatDateKey(date: Date): string {
   // Return YYYY-MM-DD for grouping
-  return date.toISOString().split('T')[0]
+  return date.toISOString().split("T")[0];
 }
 
 function formatDateLabel(date: Date): string {
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
 
-  const dateKey = formatDateKey(date)
-  const todayKey = formatDateKey(today)
-  const yesterdayKey = formatDateKey(yesterday)
+  const dateKey = formatDateKey(date);
+  const todayKey = formatDateKey(today);
+  const yesterdayKey = formatDateKey(yesterday);
 
   if (dateKey === todayKey) {
-    return 'Today'
+    return "Today";
   } else if (dateKey === yesterdayKey) {
-    return 'Yesterday'
+    return "Yesterday";
   } else {
     // Format as "Monday, Feb 4" or "Monday, Feb 4, 2025" for older years
     const options: Intl.DateTimeFormatOptions = {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric',
-    }
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    };
 
     if (date.getFullYear() !== today.getFullYear()) {
-      options.year = 'numeric'
+      options.year = "numeric";
     }
 
-    return date.toLocaleDateString('en-US', options)
+    return date.toLocaleDateString("en-US", options);
   }
 }

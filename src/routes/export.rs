@@ -31,7 +31,6 @@ struct ExportNote {
     summary: Option<String>,
     source_type: String,
     source_url: Option<String>,
-    tags: Vec<String>,
     created_at: String,
     updated_at: String,
 }
@@ -45,7 +44,6 @@ impl From<queries::Note> for ExportNote {
             summary: n.summary,
             source_type: n.source_type,
             source_url: n.source_url,
-            tags: n.tags,
             created_at: n.created_at,
             updated_at: n.updated_at,
         }
@@ -156,14 +154,7 @@ fn export_markdown_zip(notes: Vec<queries::Note>) -> Result<Response, AppError> 
             Some(t) => format!("title: \"{}\"", t.replace('"', "\\\"")),
             None => "title: \"\"".to_string(),
         };
-        let tags_yaml = format!(
-            "[{}]",
-            note.tags
-                .iter()
-                .map(|t| format!("\"{}\"", t.replace('"', "\\\"")))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+
         // Extract just the date portion from created_at (e.g. "2026-02-08" from "2026-02-08 12:00:00")
         let created_date = note
             .created_at
@@ -172,8 +163,8 @@ fn export_markdown_zip(notes: Vec<queries::Note>) -> Result<Response, AppError> 
             .unwrap_or(&note.created_at);
 
         let frontmatter = format!(
-            "---\nid: {}\n{}\nsource_type: \"{}\"\ntags: {}\ncreated_at: \"{}\"\n---\n\n",
-            note.id, title_yaml, note.source_type, tags_yaml, created_date
+            "---\nid: {}\n{}\nsource_type: \"{}\"\ncreated_at: \"{}\"\n---\n\n",
+            note.id, title_yaml, note.source_type, created_date
         );
 
         write!(zip, "{}{}", frontmatter, note.content)

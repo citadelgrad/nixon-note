@@ -102,7 +102,7 @@ async fn process_note(client: &reqwest::Client, pool: &Pool, note_id: i64) -> Re
     // Step 1 - Embed (Ollama)
     if let Err(e) = embed::embed_note(client, pool, note_id).await {
         warn!(note_id, error = ?e, "Failed to embed note");
-        // Continue to auto-tagging even if embedding fails
+        // Continue to title/summary organization even if embedding fails
     }
 
     // Step 2 - Auto-org (Claude)

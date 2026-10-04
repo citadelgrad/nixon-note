@@ -45,7 +45,7 @@ make uninstall    # Stop service; preserve formula, runtime, and data
 
 `make deploy` publishes a release under
 `~/Library/Application Support/NixonNote/runtime/releases/` and atomically
-updates `runtime/current`. If the web root or `/api/status` fails after the
+updates `runtime/current`. If the web root or `/api/health` fails after the
 restart, it restores the previous runtime and restarts again. `make clean`
 only removes checkout build products; it cannot remove the deployed runtime.
 
@@ -88,7 +88,7 @@ make restart
 
 All API requests will then require an `Authorization` header with your bearer token.
 
-Do not expose NixonNote to the public internet without `NOTE_TOKEN` and a trusted network boundary such as Tailscale or a reverse proxy with authentication. The only unauthenticated API endpoint is `/api/status`.
+Do not expose NixonNote to the public internet without `NOTE_TOKEN` and a trusted network boundary such as Tailscale or a reverse proxy with authentication. The only unauthenticated API endpoint is the minimal `/api/health` liveness check.
 
 ## Logs
 

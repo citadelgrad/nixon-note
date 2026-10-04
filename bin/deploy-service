@@ -18,7 +18,7 @@ RELEASES_DIR="$RUNTIME_DIR/releases"
 CURRENT_LINK="$RUNTIME_DIR/current"
 SERVICE_NAME="${NIXONNOTE_BREW_SERVICE:-nixonnote}"
 APP_PORT="${APP_PORT:-9999}"
-HEALTH_URL="http://127.0.0.1:$APP_PORT/api/status"
+HEALTH_URL="http://127.0.0.1:$APP_PORT/api/health"
 ROOT_URL="http://127.0.0.1:$APP_PORT/"
 
 BINARY_SRC="$PROJECT_DIR/target/release/note"

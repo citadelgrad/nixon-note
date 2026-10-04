@@ -66,10 +66,24 @@ pub async fn embed_note(client: &reqwest::Client, pool: &Pool, note_id: i64) -> 
     // Generate embedding
     let embedding = generate_embedding(client, &text).await?;
 
-    // Store embedding
-    conn.interact(move |conn| crate::db::queries::insert_embedding(conn, note_id, &embedding))
+    // Store only if the note has not changed while the model request was in flight.
+    let expected_content = note.content;
+    let stored = conn
+        .interact(move |conn| {
+            crate::db::queries::insert_embedding_if_content_matches(
+                conn,
+                note_id,
+                &expected_content,
+                &embedding,
+            )
+        })
         .await
         .map_err(|e| anyhow::anyhow!("Pool interaction error: {e}"))??;
+
+    if !stored {
+        info!(note_id, "Discarded stale embedding after note edit");
+        return Ok(());
+    }
 
     info!(note_id, "Embedded note successfully");
 

@@ -53,9 +53,9 @@ dev: _ensure-cargo-watch _ensure-web-deps _ensure-ollama _ensure-env ## Start de
 	@echo "Backend starting (pid $$(cat $(DEV_API_PID)))..."
 	@for i in $$(seq 1 60); do \
 		sleep 1; \
-		curl -sf http://localhost:$(API_PORT)/api/status >/dev/null 2>&1 && break; \
+		curl -sf http://localhost:$(API_PORT)/api/health >/dev/null 2>&1 && break; \
 	done
-	@curl -sf http://localhost:$(API_PORT)/api/status >/dev/null 2>&1 || { \
+	@curl -sf http://localhost:$(API_PORT)/api/health >/dev/null 2>&1 || { \
 		echo "Backend failed to start on port $(API_PORT)"; \
 		cat $(DEV_API_LOG) | tail -20; \
 		exit 1; \
@@ -110,7 +110,7 @@ dev-status: ## Check dev server status
 	fi
 	@echo ""
 	@echo "=== Health ==="
-	@curl -sf http://localhost:$(API_PORT)/api/status | python3 -m json.tool 2>/dev/null || echo "API not responding"
+	@curl -sf http://localhost:$(API_PORT)/api/health | python3 -m json.tool 2>/dev/null || echo "API not responding"
 
 .PHONY: run
 run: _ensure-env ## Run backend once (no reload)
@@ -217,7 +217,7 @@ status: ## Show service status and health
 	@tmp=$$(mktemp); env_file="$(HOME)/.config/nixonnote/env"; \
 	if [ -f "$$env_file" ]; then set -a; . "$$env_file"; set +a; fi; \
 	port=$${APP_PORT:-9999}; \
-	if curl -sf "http://localhost:$$port/api/status" > $$tmp; then \
+	if curl -sf -H "Authorization: Bearer $${NOTE_TOKEN:-}" "http://localhost:$$port/api/status" > $$tmp; then \
 		python3 -c 'import json, pathlib, sys; data = json.loads(pathlib.Path(sys.argv[1]).read_text()); print("server: responding"); print("auth_enabled: {}".format(data.get("server", {}).get("auth_enabled", False))); print("services:"); [print("  {}: configured={} healthy={}".format(name, svc.get("configured", False), svc.get("healthy", False))) for name, svc in sorted(data.get("services", {}).items())]' $$tmp; \
 	else \
 		echo "Not responding on port $$port"; \
